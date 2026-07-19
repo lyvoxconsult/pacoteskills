@@ -1,0 +1,7 @@
+interface:
+  display_name: "DevPromptArchitect"
+  short_description: "Prompt architecture for dev agents"
+  default_prompt: "Use $devpromptarchitect to transform my request into a robust, executable prompt for a development agent."
+
+policy:
+  allow_implicit_invocation: true
