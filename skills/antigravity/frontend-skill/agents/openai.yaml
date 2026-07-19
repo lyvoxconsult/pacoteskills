@@ -1,0 +1,4 @@
+interface:
+  display_name: "Frontend Skill"
+  short_description: "Frontend UX, responsiveness, and SEO workflow."
+  default_prompt: "Use this skill to build and review frontend interfaces with responsive UX, accessible controls, and production discipline."

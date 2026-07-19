@@ -1,0 +1,4 @@
+interface:
+  display_name: "Architecture Skill"
+  short_description: "Architecture governance for scalable software systems."
+  default_prompt: "Use this skill to analyze and evolve software architecture with clean boundaries, low coupling, and clear tradeoffs."

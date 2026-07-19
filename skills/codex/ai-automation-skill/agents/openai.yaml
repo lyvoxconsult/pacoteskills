@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI Automation Skill"
+  short_description: "AI agents, orchestration, and task automation."
+  default_prompt: "Use this skill to design AI agents, orchestrate automated workflows, and keep decision automation auditable."

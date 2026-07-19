@@ -1,0 +1,4 @@
+interface:
+  display_name: "Testing Skill"
+  short_description: "Automated unit, integration, and browser testing workflow."
+  default_prompt: "Use this skill to design, implement, run, and interpret automated tests before release."

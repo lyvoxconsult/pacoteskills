@@ -1,0 +1,4 @@
+interface:
+  display_name: "Monitoring Skill"
+  short_description: "Observability, metrics, alerts, and errors."
+  default_prompt: "Use this skill to add and review monitoring, alerting, error tracking, dashboards, and production signals."

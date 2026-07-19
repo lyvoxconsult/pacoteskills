@@ -1,0 +1,7 @@
+interface:
+  display_name: "Spec-Driven Development (SDD)"
+  short_description: "GitHub Spec-Kit workflows for executable specs"
+  default_prompt: "Use $sdd to guide a Spec-Driven Development workflow with GitHub Spec-Kit."
+
+policy:
+  allow_implicit_invocation: true

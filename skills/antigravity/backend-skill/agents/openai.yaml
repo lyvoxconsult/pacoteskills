@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend Skill"
+  short_description: "Backend API design, performance, and documentation workflow."
+  default_prompt: "Use this skill to build and review robust backend APIs with clear contracts, observability, and performance discipline."

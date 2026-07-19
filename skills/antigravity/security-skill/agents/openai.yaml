@@ -1,0 +1,4 @@
+interface:
+  display_name: "Security Skill"
+  short_description: "DevSecOps security review and vulnerability workflow."
+  default_prompt: "Use this skill to review application security, scan dependencies, harden APIs, and produce prioritized remediation."

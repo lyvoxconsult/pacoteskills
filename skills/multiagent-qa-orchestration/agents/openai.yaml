@@ -1,0 +1,7 @@
+interface:
+  display_name: "Multiagent QA Orchestration"
+  short_description: "Mandatory subagents, tests, and QA"
+  default_prompt: "Use $multiagent-qa-orchestration to decompose this task into specialist roles, testing, QA, and final validation."
+
+policy:
+  allow_implicit_invocation: true

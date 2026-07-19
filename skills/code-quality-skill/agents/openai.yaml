@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Quality Skill"
+  short_description: "Lint, formatting, static analysis, and maintainability gates."
+  default_prompt: "Use this skill to keep code changes consistent, typed, linted, formatted, and low-risk."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "DevOps Skill"
+  short_description: "Container, CI/CD, and infrastructure workflow."
+  default_prompt: "Use this skill to design and validate containerization, CI/CD, deployment, and infrastructure automation."
