@@ -4,6 +4,50 @@ Esta skill define as metodologias comportamentais, operacionais e de engenharia 
 
 ---
 
+## Skill global obrigatória: Ponytail
+
+- **Objetivo:** Aplicar em toda solicitação técnica a menor solução correta, seguindo YAGNI, reuso do código existente, biblioteca padrão e recursos nativos antes de abstrações ou dependências novas.
+- **Regra:** `ponytail` substitui `caveman` como baseline obrigatório. Nunca reduzir validação de entrada, prevenção de perda de dados, segurança, acessibilidade ou requisito explícito.
+- **Fonte e versão instalada:** `DietrichGebert/ponytail`, commit `2ed6c52c9d7e5e56942508591085fd45dea277d3`.
+
+---
+
+## Ferramentas globais condicionais
+
+| Ferramenta | Gatilho obrigatório | Limite operacional |
+|---|---|---|
+| `graphify` | Arquitetura, investigação multi-arquivo, repositório não trivial e mudanças transversais | Código é processado localmente; conteúdo sem código só usa backend externo se configurado. |
+| `headroom` | Contexto longo, RAG, logs/saídas de ferramentas volumosas ou múltiplos agentes | Executar `headroom doctor` antes do uso; não executar `wrap`, `deploy` ou proxy persistente sem pedido explícito. |
+| `outlines` | Funcionalidade de produto com geração LLM estruturada | Dependência por projeto; preferir schema na geração a parsing pós-resposta. |
+| `codeburn` | Custo, orçamento, desperdício de tokens ou retrospectiva não trivial | Apenas leitura por padrão; ações, sincronização e compartilhamento exigem pedido explícito. |
+
+Fontes instaladas/revisadas: `headroomlabs-ai/headroom` (0.35.0), `Graphify-Labs/graphify` (0.9.42), `dottxt-ai/outlines` e `getagentseal/codeburn` (0.9.20).
+
+---
+
+## Skill global obrigatória: Find Skills
+
+- **Objetivo:** Em todo pedido, descobrir quais skills locais ou externas atendem melhor ao domínio solicitado, somando-as ao pack obrigatório.
+- **Regra:** Primeiro carregar as skills obrigatórias; depois consultar o catálogo local em `C:\Users\pedro\.codex\skills` e `C:\Users\pedro\.agents\skills`; só usar `npx skills find <consulta>` ou leaderboard externo quando não houver cobertura local adequada ou quando o usuário pedir extensão de capacidades.
+- **Limite:** Não instalar automaticamente por resultado de busca. Antes de recomendar ou instalar, verificar reputação da fonte, installs/stars quando disponíveis e revisar `SKILL.md` ou fonte equivalente.
+- **Fonte instalada:** `vercel-labs/skills`, skill `find-skills`, instalada em 2026-08-24.
+
+---
+
+## Skills obrigatórias condicionais por domínio
+
+- `project-skill-audit`: setup/auditoria de skills e padrões recorrentes por projeto.
+- `frontend-skill`: UI, frontend, React/Next/Tailwind/shadcn, formulários, acessibilidade e responsividade.
+- `backend-skill`: APIs, serviços, persistência, auth/autorização, migrations e integrações backend.
+- `devops-skill`: Docker, CI/CD, deploy, build, runtime, env vars, Vercel, infra e produção.
+- `playwright`: validação real em navegador, UI flows, screenshots, responsividade, login, formulário e E2E funcional.
+- `postgres-best-practices`: Postgres, Supabase, SQL, RLS, índices, schema e performance de banco.
+- `react-best-practices`: React/Next.js, data fetching, bundle, renderização, waterfalls, componentes e performance.
+- `api-security-testing`: segurança REST/GraphQL, auth, autorização, rate limit, input validation, CORS e erros.
+- `skill-scanner`: antes de instalar/adotar/recomendar skill externa ou desconhecida.
+
+---
+
 ## 🔍 Skill 1: Análise de Contexto Sistêmico
 
 - **Objetivo:** Garantir que o agente compreenda todo o ecossistema antes de tocar em qualquer linha de código.

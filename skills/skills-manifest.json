@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "manifestVersion": "1.0.0",
-  "generatedAt": "2026-07-12",
+  "generatedAt": "2026-08-24",
   "policy": {
     "mode": "reference-and-sync",
     "copySkillsIntoRepository": false,
@@ -11,11 +11,18 @@
   },
   "skills": [
     {
-      "name": "caveman",
+      "name": "ponytail",
       "required": "always",
-      "status": "available-canonical",
-      "canonical": "C:\\Users\\pedro\\.codex\\skills\\caveman\\SKILL.md",
-      "compatibility": "C:\\Users\\pedro\\.agents\\skills\\caveman\\SKILL.md"
+      "status": "available-canonical-and-compatibility",
+      "canonical": "C:\\Users\\pedro\\.codex\\skills\\ponytail\\SKILL.md",
+      "compatibility": "C:\\Users\\pedro\\.agents\\skills\\ponytail\\SKILL.md"
+    },
+    {
+      "name": "graphify",
+      "required": "architecture-or-nontrivial-codebase-exploration",
+      "status": "available-canonical-and-compatibility",
+      "canonical": "C:\\Users\\pedro\\.codex\\skills\\graphify\\SKILL.md",
+      "compatibility": "C:\\Users\\pedro\\.agents\\skills\\graphify\\SKILL.md"
     },
     {
       "name": "lyvox-core-reader",
@@ -86,6 +93,96 @@
       "status": "available-canonical-and-compatibility",
       "canonical": "C:\\Users\\pedro\\.codex\\skills\\devpromptarchitect\\SKILL.md",
       "compatibility": "C:\\Users\\pedro\\.agents\\skills\\devpromptarchitect\\SKILL.md"
+    },
+    {
+      "name": "find-skills",
+      "required": "always-after-mandatory-pack-for-skill-discovery",
+      "status": "available-canonical-and-compatibility",
+      "canonical": "C:\\Users\\pedro\\.codex\\skills\\find-skills\\SKILL.md",
+      "compatibility": "C:\\Users\\pedro\\.agents\\skills\\find-skills\\SKILL.md"
+    },
+    {
+      "name": "project-skill-audit",
+      "required": "conditional-skill-setup-or-project-skill-audit",
+      "status": "available-canonical",
+      "canonical": "C:\\Users\\pedro\\.codex\\skills\\project-skill-audit\\SKILL.md",
+      "compatibility": "C:\\Users\\pedro\\.agents\\skills\\project-skill-audit\\SKILL.md"
+    },
+    {
+      "name": "frontend-skill",
+      "required": "conditional-frontend-ui",
+      "status": "available-canonical",
+      "canonical": "C:\\Users\\pedro\\.codex\\skills\\frontend-skill\\SKILL.md",
+      "compatibility": "C:\\Users\\pedro\\.agents\\skills\\frontend-skill\\SKILL.md"
+    },
+    {
+      "name": "backend-skill",
+      "required": "conditional-backend-api-persistence",
+      "status": "available-canonical",
+      "canonical": "C:\\Users\\pedro\\.codex\\skills\\backend-skill\\SKILL.md",
+      "compatibility": "C:\\Users\\pedro\\.agents\\skills\\backend-skill\\SKILL.md"
+    },
+    {
+      "name": "devops-skill",
+      "required": "conditional-devops-runtime-deploy",
+      "status": "available-canonical",
+      "canonical": "C:\\Users\\pedro\\.codex\\skills\\devops-skill\\SKILL.md",
+      "compatibility": "C:\\Users\\pedro\\.agents\\skills\\devops-skill\\SKILL.md"
+    },
+    {
+      "name": "playwright",
+      "required": "conditional-browser-ui-flow-validation",
+      "status": "available-canonical",
+      "canonical": "C:\\Users\\pedro\\.codex\\skills\\playwright\\SKILL.md",
+      "compatibility": "C:\\Users\\pedro\\.agents\\skills\\playwright\\SKILL.md"
+    },
+    {
+      "name": "postgres-best-practices",
+      "required": "conditional-postgres-supabase-sql",
+      "status": "available-canonical",
+      "canonical": "C:\\Users\\pedro\\.codex\\skills\\postgres-best-practices\\SKILL.md",
+      "compatibility": "C:\\Users\\pedro\\.agents\\skills\\postgres-best-practices\\SKILL.md"
+    },
+    {
+      "name": "react-best-practices",
+      "required": "conditional-react-nextjs-performance",
+      "status": "available-canonical",
+      "canonical": "C:\\Users\\pedro\\.codex\\skills\\react-best-practices\\SKILL.md",
+      "compatibility": "C:\\Users\\pedro\\.agents\\skills\\react-best-practices\\SKILL.md"
+    },
+    {
+      "name": "api-security-testing",
+      "required": "conditional-api-security-testing",
+      "status": "available-canonical",
+      "canonical": "C:\\Users\\pedro\\.codex\\skills\\api-security-testing\\SKILL.md",
+      "compatibility": "C:\\Users\\pedro\\.agents\\skills\\api-security-testing\\SKILL.md"
+    },
+    {
+      "name": "skill-scanner",
+      "required": "conditional-before-external-skill-adoption",
+      "status": "available-canonical",
+      "canonical": "C:\\Users\\pedro\\.codex\\skills\\skill-scanner\\SKILL.md",
+      "compatibility": "C:\\Users\\pedro\\.agents\\skills\\skill-scanner\\SKILL.md"
+    }
+  ],
+  "tools": [
+    {
+      "name": "headroom",
+      "required": "long-context-rag-or-large-tool-output",
+      "version": "0.35.0",
+      "command": "headroom"
+    },
+    {
+      "name": "outlines",
+      "required": "application-llm-structured-output",
+      "installation": "project-scoped-python-dependency"
+    },
+    {
+      "name": "codeburn",
+      "required": "cost-budget-or-token-efficiency-analysis",
+      "version": "0.9.20",
+      "command": "codeburn",
+      "defaultMode": "read-only"
     }
   ]
 }
