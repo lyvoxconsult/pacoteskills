@@ -126,10 +126,10 @@ Antes de gerar o prompt final, analise internamente:
 
 ## Integração com Obsidian
 
-Quando o pedido envolver projetos Lyvox ou desenvolvimento contínuo, o prompt final deve instruir o agente a consultar:
+Quando o pedido envolver projetos persistentes ou desenvolvimento contínuo, o prompt final deve instruir o agente a consultar:
 
 ```
-D:\Obsidian lyvox
+<obsidian-vault-path>
 ```
 
 E ao final registrar no Obsidian: o que foi feito, decisões técnicas, arquivos alterados, problemas, soluções, testes realizados, pendências e próximos passos.

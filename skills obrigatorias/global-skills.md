@@ -7,7 +7,7 @@ Esta skill define as metodologias comportamentais, operacionais e de engenharia 
 ## Skill global obrigatória: Find Skills
 
 - **Objetivo:** Em todo pedido, descobrir quais skills locais ou externas atendem melhor ao domínio solicitado, somando-as ao pack obrigatório.
-- **Regra:** Primeiro carregar as skills obrigatórias; depois consultar o catálogo local em `C:\Users\pedro\.codex\skills` e `C:\Users\pedro\.agents\skills`; só usar `npx skills find <consulta>` ou leaderboard externo quando não houver cobertura local adequada ou quando o usuário pedir extensão de capacidades.
+- **Regra:** Primeiro carregar as skills obrigatórias; depois consultar o catálogo local em `${HOME}/.codex/skills` e `${HOME}/.agents/skills`; só usar `npx skills find <consulta>` ou leaderboard externo quando não houver cobertura local adequada ou quando o usuário pedir extensão de capacidades.
 - **Limite:** Não instalar automaticamente por resultado de busca. Antes de recomendar ou instalar, verificar reputação da fonte, installs/stars quando disponíveis e revisar `SKILL.md` ou fonte equivalente.
 - **Fonte instalada:** `vercel-labs/skills`, skill `find-skills`, instalada em 2026-08-24.
 

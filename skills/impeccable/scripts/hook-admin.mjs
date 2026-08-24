@@ -20,6 +20,7 @@
  */
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 import {
@@ -44,6 +45,9 @@ const IMPECCABLE_HOOK_COMMAND_MARKERS = [
 ];
 const TIMEOUT_SECONDS = 5;
 const STATUS_MESSAGE = 'Checking UI changes';
+const CODEX_SKILLS_ROOT = process.env.CODEX_SKILLS_ROOT || path.join(os.homedir(), '.codex', 'skills');
+const CODEX_IMPECCABLE_ROOT = path.join(CODEX_SKILLS_ROOT, 'impeccable');
+const toPosixPath = (value) => value.replace(/\\/g, '/');
 
 const HOOK_MANIFEST_TARGETS = [
   {
@@ -72,7 +76,7 @@ const HOOK_MANIFEST_TARGETS = [
   },
   {
     provider: '.codex-global',
-    skillRel: 'C:/Users/pedro/.codex/skills/impeccable',
+    skillPath: CODEX_IMPECCABLE_ROOT,
     destRel: '.codex/hooks.json',
     manifest: () => ({
       hooks: {
@@ -82,7 +86,7 @@ const HOOK_MANIFEST_TARGETS = [
             hooks: [
               {
                 type: 'command',
-                command: 'node "C:/Users/pedro/.codex/skills/impeccable/scripts/hook.mjs"',
+                command: `node "${toPosixPath(path.join(CODEX_IMPECCABLE_ROOT, 'scripts', 'hook.mjs'))}"`,
                 timeout: TIMEOUT_SECONDS,
                 statusMessage: STATUS_MESSAGE,
               },
@@ -352,7 +356,8 @@ function setEnabled(cwd, value) {
 function repairHookManifests(cwd) {
   const result = { written: [], already: [], backups: [] };
   for (const target of HOOK_MANIFEST_TARGETS) {
-    if (!fs.existsSync(path.join(cwd, target.skillRel))) continue;
+    const skillPath = target.skillPath || path.join(cwd, target.skillRel);
+    if (!fs.existsSync(skillPath)) continue;
     const dest = path.join(cwd, target.destRel);
     const sharedDest = target.sharedDestRel ? path.join(cwd, target.sharedDestRel) : null;
 

@@ -153,7 +153,7 @@ Este é o agente de desenvolvimento completo para projetos Next.js + Supabase + 
 
 ### Variáveis de Ambiente Obrigatórias
 ```
-OBSIDIAN_VAULT_PATH=D:\Lyvox Core\Lyvox Core
+OBSIDIAN_VAULT_PATH=<obsidian-vault-path>
 OBSIDIAN_API_URL=http://localhost:PORT
 PROJECT_PATH=<caminho-do-projeto-atual>
 ```

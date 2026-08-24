@@ -26,7 +26,7 @@ No Obsidian:
 # Variáveis de ambiente
 export OBSIDIAN_API_URL=http://localhost:27123
 export OBSIDIAN_API_TOKEN=seu_token_aqui
-export OBSIDIAN_VAULT_PATH=D:\Lyvox Core\Lyvox Core
+export OBSIDIAN_VAULT_PATH=<obsidian-vault-path>
 ```
 
 ## Como Usar

@@ -92,6 +92,6 @@ Adicionar conforme o domínio:
 
 ## Referências
 
-- Lyvox Core: [[Pack Obrigatório de 10 Skills]]
+- Vault note: [[Pack Obrigatório de 10 Skills]]
 - Mapeamento: [[Skills Obrigatórias por Tipo de Tarefa]]
 - Regras: [[Regra Global de Uso de Skills]]

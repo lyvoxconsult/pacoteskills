@@ -13,9 +13,9 @@ This script packages skills into the correct ZIP format.
 
 Usage:
     python package_skill.py --source "C:\\path\\to\\skill"
-    python package_skill.py --source "C:\\path\\to\\skill" --output "C:\\Users\\renat\\Desktop"
+    python package_skill.py --source "C:\\path\\to\\skill" --output "<output-directory>"
     python package_skill.py --all
-    python package_skill.py --all --output "C:\\Users\\renat\\Desktop"
+    python package_skill.py --all --output "<output-directory>"
 """
 
 import os
@@ -27,7 +27,7 @@ from pathlib import Path
 
 # ── Configuration ──────────────────────────────────────────────────────────
 
-SKILLS_ROOT = Path(r"C:\Users\renat\skills")
+SKILLS_ROOT = Path(os.environ.get("SKILLS_ROOT", "./skills")).expanduser()
 DEFAULT_OUTPUT = Path(os.path.expanduser("~")) / "Desktop"
 
 # Directories to exclude from ZIP

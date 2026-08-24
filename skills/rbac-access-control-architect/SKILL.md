@@ -300,7 +300,7 @@ viewer
 client
 ```
 
-### Em projetos Lyvox (quando fizer sentido)
+### Em projetos SaaS com times internos e clientes (quando fizer sentido)
 
 ```
 proprietario
@@ -869,9 +869,9 @@ Quando RBAC envolver tela de administração, garantir que exista:
 
 ---
 
-## 30. Regras para Agentes em Projetos Lyvox
+## 30. Regras para Agentes em Projetos SaaS com contexto persistente
 
-Em projetos Lyvox, considerar como padrão:
+Nesses projetos, considerar como padrão:
 
 - Uso frequente de Supabase
 - Necessidade de RLS

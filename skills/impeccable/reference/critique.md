@@ -1,4 +1,4 @@
-﻿### Purpose
+### Purpose
 
 Resolve one stable target, run two independent assessments, synthesize a design critique, persist a snapshot, and ask the user what to improve next. The chat response is the primary deliverable; the snapshot is an archive/backlog for future commands.
 
@@ -21,7 +21,7 @@ Resolve one stable target, run two independent assessments, synthesize a design 
    - "this page" -> the current URL or source file
 2. **Compute the slug**:
    ```bash
-   node C:/Users/pedro/.codex/skills/impeccable/scripts/critique-storage.mjs slug "<resolved-path-or-url>"
+   node <codex-skills-root>/impeccable/scripts/critique-storage.mjs slug "<resolved-path-or-url>"
    ```
    Keep it. If the command exits non-zero, skip persistence and trend for this run, but continue the critique.
 3. **Read `.impeccable/critique/ignore.md`** if it exists. Drop matching findings silently; it is the only prior-run input critique consumes.
@@ -66,7 +66,7 @@ Run the bundled detector and browser visualization evidence. Assessment B is man
 
 CLI scan:
 ```bash
-node C:/Users/pedro/.codex/skills/impeccable/scripts/detect.mjs --json [target]
+node <codex-skills-root>/impeccable/scripts/detect.mjs --json [target]
 ```
 
 - Pass markup files/directories as `[target]`; do not pass CSS-only files.
@@ -80,7 +80,7 @@ Browser visualization is required for a viewable target when browser automation 
 1. Create a fresh tab and navigate. Prefer the harness's native/browser-canvas screenshot path before hand-rolling a Playwright/Puppeteer script; only fall back to a custom script when no native browser tool is exposed.
 2. Preflight mutable injection by setting `document.title` and appending a `<script>` tag. Read-only evaluate APIs do not count.
 3. If mutation is unavailable, skip live server, browser presentation, and injection; report fallback signal.
-4. If mutation is available, start `node C:/Users/pedro/.codex/skills/impeccable/scripts/live-server.mjs --background`, present the browser if supported, label `[Human]`, scroll top, inject `http://localhost:PORT/detect.js`, wait 2-3 seconds, read `impeccable` console messages, then stop the live server.
+4. If mutation is available, start `node <codex-skills-root>/impeccable/scripts/live-server.mjs --background`, present the browser if supported, label `[Human]`, scroll top, inject `http://localhost:PORT/detect.js`, wait 2-3 seconds, read `impeccable` console messages, then stop the live server.
 5. For multi-view targets, inject on 3-5 representative pages.
 
 Codex Browser note: Use the Browser skill. Do not spend a Browser attempt on `file://`. Only call `visibility.set(true)` after mutable script injection is confirmed for the `[Human]` overlay path; verify with `get()`. Use `tab.dev.logs({ filter: "impeccable" })` for console results. Its Playwright `evaluate(...)` surface is read-only; do not rely on it for mutation.
@@ -201,7 +201,7 @@ Skip this step if the Setup slug was null (vague or root-level target).
 2. **Pass the structured metadata** through `IMPECCABLE_CRITIQUE_META` (JSON), then run the write command:
    ```bash
    IMPECCABLE_CRITIQUE_META='{"target":"<user phrasing>","total_score":<n>,"p0_count":<n>,"p1_count":<n>}' \
-     node C:/Users/pedro/.codex/skills/impeccable/scripts/critique-storage.mjs write <slug> <body-file>
+     node <codex-skills-root>/impeccable/scripts/critique-storage.mjs write <slug> <body-file>
    ```
    The helper prints the absolute path it wrote.
 
@@ -209,7 +209,7 @@ Skip this step if the Setup slug was null (vague or root-level target).
 
 4. **Read the trend** for context:
    ```bash
-   node C:/Users/pedro/.codex/skills/impeccable/scripts/critique-storage.mjs trend <slug> 5
+   node <codex-skills-root>/impeccable/scripts/critique-storage.mjs trend <slug> 5
    ```
    This returns a JSON array of the last 5 frontmatter entries (including the one you just wrote).
 

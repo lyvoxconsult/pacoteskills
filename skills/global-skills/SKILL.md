@@ -31,7 +31,7 @@ Esta skill define as metodologias comportamentais, operacionais e de engenharia 
 - **Objetivo:** Ativar a skill global `sdd` quando o trabalho envolver GitHub Spec-Kit, Spec-Driven Development, `/speckit`, `specify init`, especificacoes executaveis, fluxos greenfield/brownfield, reverse engineering de codebase, planejamento por requisitos ou gestao de features.
 - **Roteiro Operacional:**
   1. **Classificacao:** Confirmar se a tarefa realmente pede SDD/Spec-Kit antes de ativar; nao usar em tarefa comum de codigo sem relacao com SDD.
-  2. **Workflow:** Escolher greenfield ou brownfield, carregar `C:\Users\pedro\.agents\skills\sdd\SKILL.md` e seguir as referencias relevantes.
+  2. **Workflow:** Escolher greenfield ou brownfield, carregar `${HOME}/.agents/skills\sdd\SKILL.md` e seguir as referencias relevantes.
   3. **Artefatos:** Ler especificacoes, planos, tasks e checklists gerados antes de resumir decisoes.
   4. **Validacao:** Separar decisoes geradas por IA de validacao comprovada por codigo, testes e criterios de aceite.
   5. **Documentacao:** Manter rastreio em Obsidian quando a decisao ou workflow for persistente.

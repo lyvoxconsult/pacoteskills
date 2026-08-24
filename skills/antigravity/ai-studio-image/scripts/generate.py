@@ -280,7 +280,7 @@ def generate(
         print()
         print("  Configure de uma dessas formas:")
         print("  1. Variavel de ambiente: set GEMINI_API_KEY=sua-key")
-        print("  2. Arquivo .env em: C:\\Users\\renat\\skills\\ai-studio-image\\")
+        print("  2. Arquivo .env em: <skills-root>\\ai-studio-image\\")
         print()
         print("  Obtenha sua key em: https://aistudio.google.com/apikey")
         sys.exit(1)

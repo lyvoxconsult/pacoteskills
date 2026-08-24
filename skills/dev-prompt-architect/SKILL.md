@@ -253,10 +253,10 @@ Use subagentes quando agregarem qualidade real à execução.
 
 ## Integração com Obsidian
 
-Quando o pedido envolver projetos do usuário (especialmente projetos Lyvox ou desenvolvimento contínuo), o prompt final deve instruir o agente executor a consultar a base local:
+Quando o pedido envolver projetos do usuário (especialmente projetos persistentes ou desenvolvimento contínuo), o prompt final deve instruir o agente executor a consultar a base local:
 
 ```
-D:\Obsidian lyvox
+<obsidian-vault-path>
 ```
 
 O agente executor deve:

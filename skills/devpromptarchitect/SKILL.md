@@ -116,18 +116,18 @@ Use subagents only when they improve quality: multiple layers, independent conce
 
 ## Obsidian Integration
 
-When a request involves the user's projects, persistent decisions, Lyvox work, or ongoing development, instruct the executor to consult local Obsidian context before acting.
+When a request involves the user's projects, persistent decisions, workspace-specific work, or ongoing development, instruct the executor to consult local Obsidian context before acting.
 
 Preferred global vault:
 
 ```text
-D:\Lyvox Core\Lyvox Core
+<obsidian-vault-path>
 ```
 
-Lyvox-specific vault may also be relevant:
+If the user maintains more than one local vault, consult the relevant one:
 
 ```text
-D:\Lyvox Core\Lyvox Core
+<obsidian-vault-path>
 ```
 
 The executor must:
