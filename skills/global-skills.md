@@ -16,12 +16,14 @@ Esta skill define as metodologias comportamentais, operacionais e de engenharia 
 
 | Ferramenta | Gatilho obrigatório | Limite operacional |
 |---|---|---|
-| `graphify` | Arquitetura, investigação multi-arquivo, repositório não trivial e mudanças transversais | Código é processado localmente; conteúdo sem código só usa backend externo se configurado. |
+| `graphify` | Primeira escolha obrigatória para arquitetura, investigação multi-arquivo, repositório não trivial e mudanças transversais | Gere ou atualize `graphify-out/` antes de varredura ampla; código é processado localmente e conteúdo sem código só usa backend externo se configurado. |
 | `headroom` | Contexto longo, RAG, logs/saídas de ferramentas volumosas ou múltiplos agentes | Executar `headroom doctor` antes do uso; não executar `wrap`, `deploy` ou proxy persistente sem pedido explícito. |
 | `outlines` | Funcionalidade de produto com geração LLM estruturada | Dependência por projeto; preferir schema na geração a parsing pós-resposta. |
 | `codeburn` | Custo, orçamento, desperdício de tokens ou retrospectiva não trivial | Apenas leitura por padrão; ações, sincronização e compartilhamento exigem pedido explícito. |
 
 Fontes instaladas/revisadas: `headroomlabs-ai/headroom` (0.35.0), `Graphify-Labs/graphify` (0.9.42), `dottxt-ai/outlines` e `getagentseal/codeburn` (0.9.20).
+
+Regra operacional: quando houver dúvida entre começar por leitura manual ampla ou por mapeamento estrutural, começar por `graphify`.
 
 ---
 

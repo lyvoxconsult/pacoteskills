@@ -9,9 +9,10 @@ Esta skill define as metodologias comportamentais, operacionais e de engenharia 
 - **Objetivo:** Garantir que o agente compreenda todo o ecossistema antes de tocar em qualquer linha de código.
 - **Roteiro Operacional:**
   1. **Varredura Preventiva:** Liste a pasta raiz do projeto ativo e leia arquivos como `package.json`, `pnpm-lock.yaml`, `tsconfig.json` ou `requirements.txt` para entender dependências e versões.
-  2. **Consulta a Notas:** Leia o arquivo de visão geral correspondente no Obsidian (`10 - Projetos/NomeDoProjeto/00 - Visão Geral.md`).
-  3. **Identificação de Riscos:** Mapeie possíveis efeitos colaterais em áreas e arquivos importadores.
-  4. **Proposta de Plano:** Elabore um plano de execução claro em `/implementation_plan.md` detalhando as fases.
+2. **Consulta a Notas:** Leia o arquivo de visão geral correspondente no Obsidian (`10 - Projetos/NomeDoProjeto/00 - Visão Geral.md`).
+3. **Identificação de Riscos:** Mapeie possíveis efeitos colaterais em áreas e arquivos importadores.
+4. **Proposta de Plano:** Elabore um plano de execução claro em `/implementation_plan.md` detalhando as fases.
+  5. **Mapeamento Estrutural Primeiro:** Quando a tarefa envolver arquitetura, exploração multi-arquivo, base não trivial ou mudança transversal, usar `graphify` antes da varredura manual ampla e consultar `graphify-out/` como mapa inicial.
 
 ---
 

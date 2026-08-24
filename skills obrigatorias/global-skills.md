@@ -13,6 +13,15 @@ Esta skill define as metodologias comportamentais, operacionais e de engenharia 
 
 ---
 
+## Ferramenta global condicional prioritária: Graphify
+
+- **Objetivo:** Antes de investigação arquitetural, exploração de repositório não trivial, mudanças transversais ou análise multi-arquivo, mapear a base com `graphify` e consultar o grafo antes de varrer arquivos em massa.
+- **Regra:** `graphify` não é “sempre”; é a primeira escolha obrigatória quando a tarefa depende de entendimento estrutural real.
+- **Limite:** Não usar para perguntas rápidas ou alteração isolada e evidente.
+- **Fonte instalada:** `Graphify-Labs/graphify`, versão `0.9.42`.
+
+---
+
 ## Skills obrigatórias condicionais por domínio
 
 - `project-skill-audit`: setup/auditoria de skills e padrões recorrentes por projeto.
