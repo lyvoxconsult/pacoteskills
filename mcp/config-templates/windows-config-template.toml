@@ -56,7 +56,7 @@ args = [
   "@modelcontextprotocol/server-filesystem",
   "<WORKSPACE_ROOT>",
   "<REFERENCES_ROOT>",
-  "<LYVOX_CORE_ROOT>"
+  "<KNOWLEDGE_BASE_ROOT>"
 ]
 startup_timeout_sec = 20
 tool_timeout_sec = 120

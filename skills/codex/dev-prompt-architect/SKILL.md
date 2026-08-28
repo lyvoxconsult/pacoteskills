@@ -3,7 +3,7 @@ name: dev-prompt-architect
 description: "Use when the user asks to create, improve or transform a request into a technical prompt. Use when planning implementation, specifying features, organizing requirements, or converting informal requests into executable technical instructions for coding agents."
 category: prompt-engineering
 risk: low
-source: lyvox
+source: local
 date_added: "2026-06-15"
 ---
 

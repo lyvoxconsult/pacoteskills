@@ -43,4 +43,4 @@ Referencia apenas. Nao copiar literalmente para outras maquinas.
 
 - `<workspace-root>`
 - `<references-root>/claude-cookbooks-main/claude-cookbooks-main`
-- `<lyvox-core-root>`
+- `<knowledge-base-root>`

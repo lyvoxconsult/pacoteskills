@@ -18,11 +18,11 @@
       "compatibility": "${HOME}/.agents/skills/ponytail/SKILL.md"
     },
     {
-      "name": "lyvox-core-reader",
-      "required": "lyvox-knowledge-tasks",
+      "name": "knowledge-base-reader",
+      "required": "internal-knowledge-tasks",
       "status": "missing-local-review-required",
-      "canonical": "${HOME}/.codex/skills/lyvox-core-reader/SKILL.md",
-      "compatibility": "${HOME}/.agents/skills/lyvox-core-reader/SKILL.md"
+      "canonical": "${HOME}/.codex/skills/knowledge-base-reader/SKILL.md",
+      "compatibility": "${HOME}/.agents/skills/knowledge-base-reader/SKILL.md"
     },
     {
       "name": "audit-context-building",

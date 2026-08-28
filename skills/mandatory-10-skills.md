@@ -26,7 +26,7 @@ tags:
 
 > **Regra:** Todo agente ou IDE DEVE carregar este pack antes de qualquer trabalho. As 10 skills são o baseline universal.
 
-> Estado observado em 2026-08-24: `lyvox-core-reader` está ausente e não deve ser simulada. `find-skills` é uma skill obrigatória adicional de descoberta em todo pedido. `devpromptarchitect` continua obrigatória quando acionada pelas regras globais.
+> Estado observado em 2026-08-24: a skill de leitura de knowledge base interna está ausente e não deve ser simulada. `find-skills` é uma skill obrigatória adicional de descoberta em todo pedido. `devpromptarchitect` continua obrigatória quando acionada pelas regras globais.
 
 ---
 
@@ -35,7 +35,7 @@ tags:
 | # | Skill | Propósito | Quando Usar |
 |---|-------|-----------|-------------|
 | 1 | **ponytail** | Solução mínima correta: YAGNI, reuso, stdlib/nativo primeiro e menor diff seguro | Sempre — baseline global; não reduzir validação, segurança ou acessibilidade |
-| 2 | **lyvox-core-reader** | Leitura do knowledge base, MOCs, registries | Antes de consultar ou modificar o knowledge |
+| 2 | **knowledge-base-reader** | Leitura de knowledge base, MOCs e registries | Antes de consultar ou modificar o knowledge |
 | 3 | **audit-context-building** | Entender contexto real antes de agir | Antes de tarefas significativas |
 | 4 | **deep-research** | Pesquisa profunda externa | Quando conhecimento interno é insuficiente |
 | 5 | **concise-planning** | Planejar antes de executar | Antes de tarefas com múltiplos passos |

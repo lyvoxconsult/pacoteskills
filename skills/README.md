@@ -3,14 +3,14 @@
 O arquivo canônico é [skills-manifest.json](skills-manifest.json). Ele registra o baseline operacional e seu estado observado; não autoriza instalação automática.
 
 - Dez skills estavam disponíveis no ambiente consultado.
-- `lyvox-core-reader` está ausente e exige criação/revisão antes de uso.
+- a skill de leitura de knowledge base interna está ausente e exige criação/revisão antes de uso.
 - `devpromptarchitect` é obrigatória quando acionada por prompt, arquitetura de prompt ou preparação de tarefa técnica.
 - `skills-pack/` é referência histórica, não catálogo autorizado para cópia integral.
 
 ## Instalar apenas metadados
 
 ```bash
-./skills/install-skills.sh --target /opt/lyvox/skills
+./skills/install-skills.sh --target /opt/agent/skills
 ```
 
 ## Sincronizar conteúdo revisado

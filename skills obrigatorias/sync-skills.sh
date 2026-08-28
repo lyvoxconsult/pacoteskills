@@ -4,7 +4,7 @@ umask 027
 
 readonly REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 manifest="${SKILLS_MANIFEST:-$REPO_ROOT/skills/skills-manifest.json}"
-target="${SKILLS_DESTINATION:-${LYVOX_ROOT:-/opt/lyvox}/skills/codex}"
+target="${SKILLS_DESTINATION:-${AGENT_SKILLS_ROOT:-/opt/agent}/skills/codex}"
 sources="${SKILLS_SOURCE_PATHS:-}"
 approval="${SKILLS_APPROVAL_FILE:-}"
 apply=false
