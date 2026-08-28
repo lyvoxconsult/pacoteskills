@@ -6,7 +6,7 @@ Escopo:
 - `plugins.md`: plugins habilitados no Codex
 - `mcp-servers.md`: servidores MCP ativos e desabilitados
 - `connections.md`: conexoes, autenticacao, approvals e observacoes de portabilidade
-- `config-templates/`: templates sem segredos para Windows e macOS
+- `config-templates/`: templates sem segredos para Windows, macOS e Linux
 
 Regras:
 - nao versionar tokens, api keys, cookies ou headers secretos
@@ -15,4 +15,4 @@ Regras:
 
 Fonte desta captura:
 - ambiente local auditado em `2026-08-28`
-- origem operacional: `C:\Users\pedro\.codex\config.toml`
+- origem operacional: config local do Codex da maquina auditada
