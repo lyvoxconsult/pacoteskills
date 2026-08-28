@@ -1,0 +1,77 @@
+[mcp]
+remote_mcp_client_enabled = true
+
+[mcp_servers.openaiDeveloperDocs]
+url = "https://developers.openai.com/mcp"
+
+[mcp_servers.composio]
+url = "https://connect.composio.dev/mcp"
+
+[mcp_servers.composio.http_headers]
+x-consumer-api-key = "<COMPOSIO_API_KEY>"
+
+[mcp_servers.context7]
+type = "http"
+url = "https://mcp.context7.com/mcp"
+
+[mcp_servers.context7.http_headers]
+CONTEXT7_API_KEY = "<CONTEXT7_API_KEY>"
+
+[mcp_servers.gsap]
+command = "node"
+args = ["<CODEX_HOME>\\mcp\\gsap\\start-gsap-mcp.mjs"]
+startup_timeout_sec = 20
+tool_timeout_sec = 120
+
+[mcp_servers.chrome-devtools]
+command = "cmd"
+args = ["/c", "npx", "-y", "chrome-devtools-mcp@latest"]
+startup_timeout_sec = 20
+tool_timeout_sec = 120
+
+[mcp_servers.playwright]
+command = "cmd"
+args = ["/c", "npx", "-y", "@playwright/mcp@latest"]
+startup_timeout_sec = 20
+tool_timeout_sec = 120
+
+[mcp_servers.shadcn]
+command = "cmd"
+args = ["/c", "npx", "-y", "shadcn@latest", "mcp"]
+startup_timeout_sec = 20
+tool_timeout_sec = 120
+
+[mcp_servers.chakra-ui]
+command = "cmd"
+args = ["/c", "npx", "-y", "@chakra-ui/react-mcp"]
+startup_timeout_sec = 20
+tool_timeout_sec = 120
+
+[mcp_servers.filesystem]
+command = "cmd"
+args = [
+  "/c",
+  "npx",
+  "-y",
+  "@modelcontextprotocol/server-filesystem",
+  "<WORKSPACE_ROOT>",
+  "<REFERENCES_ROOT>",
+  "<LYVOX_CORE_ROOT>"
+]
+startup_timeout_sec = 20
+tool_timeout_sec = 120
+
+[mcp_servers.supabase]
+url = "https://mcp.supabase.com/mcp?project_ref=<SUPABASE_PROJECT_REF>&read_only=true"
+
+[mcp_servers.vercel]
+url = "https://mcp.vercel.com"
+
+[mcp_servers.figma]
+url = "https://mcp.figma.com/mcp"
+
+[mcp_servers.stitch]
+url = "https://stitch.googleapis.com/mcp"
+
+[mcp_servers.stitch.http_headers]
+X-Goog-Api-Key = "<STITCH_API_KEY>"
