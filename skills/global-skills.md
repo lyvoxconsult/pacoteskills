@@ -47,6 +47,7 @@ Regra operacional: quando houver dúvida entre começar por leitura manual ampla
 - `react-best-practices`: React/Next.js, data fetching, bundle, renderização, waterfalls, componentes e performance.
 - `api-security-testing`: segurança REST/GraphQL, auth, autorização, rate limit, input validation, CORS e erros.
 - `skill-scanner`: antes de instalar/adotar/recomendar skill externa ou desconhecida.
+- `reference-first-ui`: antes de criar interfaces novas ou fazer redesenho visual sem referência explícita.
 
 ---
 

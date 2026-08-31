@@ -88,6 +88,34 @@
       "compatibility": "${HOME}/.agents/skills/devpromptarchitect/SKILL.md"
     },
     {
+      "name": "i-have-adhd",
+      "required": "output-style-or-user-specified",
+      "status": "available-canonical-and-compatibility",
+      "canonical": "${HOME}/.codex/skills/i-have-adhd/SKILL.md",
+      "compatibility": "${HOME}/.agents/skills/i-have-adhd/SKILL.md"
+    },
+    {
+      "name": "book-to-skill",
+      "required": "document-to-skill-or-knowledge-base-work",
+      "status": "available-canonical-and-compatibility",
+      "canonical": "${HOME}/.codex/skills/book-to-skill/SKILL.md",
+      "compatibility": "${HOME}/.agents/skills/book-to-skill/SKILL.md"
+    },
+    {
+      "name": "reverse-skill",
+      "required": "authorized-security-research-or-reverse-engineering",
+      "status": "available-canonical-and-compatibility",
+      "canonical": "${HOME}/.codex/skills/reverse-skill/SKILL.md",
+      "compatibility": "${HOME}/.agents/skills/reverse-skill/SKILL.md"
+    },
+    {
+      "name": "reference-first-ui",
+      "required": "ui-reference-first-or-new-interface-work",
+      "status": "available-canonical-and-compatibility",
+      "canonical": "${HOME}/.codex/skills/reference-first-ui/SKILL.md",
+      "compatibility": "${HOME}/.agents/skills/reference-first-ui/SKILL.md"
+    },
+    {
       "name": "find-skills",
       "required": "always-after-mandatory-pack-for-skill-discovery",
       "status": "available-canonical-and-compatibility",

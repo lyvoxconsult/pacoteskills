@@ -33,6 +33,24 @@ Esta skill define as metodologias comportamentais, operacionais e de engenharia 
 - `react-best-practices`: React/Next.js, data fetching, bundle, renderização, waterfalls, componentes e performance.
 - `api-security-testing`: segurança REST/GraphQL, auth, autorização, rate limit, input validation, CORS e erros.
 - `skill-scanner`: antes de instalar/adotar/recomendar skill externa ou desconhecida.
+- `reference-first-ui`: antes de criar interfaces novas ou fazer redesenho visual sem referência explícita.
+
+## Fontes de referência padrão para UI e composição visual
+
+Quando a tarefa envolver interface, composição visual, componentes, design system, landing page ou onboarding:
+
+- Consultar primeiro `ui.shadcn.com` como referência de implementação e anatomia de componentes.
+- Consultar `21st.dev` para variações de componentes, layouts e padrões visuais prontos.
+- Consultar `componentry.dev` para blocos e padrões reutilizáveis de interface.
+- Consultar `styles.refero.design` para referências de direção visual, estilos e composição.
+- Evitar criar do zero quando uma referência curada resolver o problema com menor risco e menor tempo.
+- Quando a solução usar shadcn/ui, tratar `init`, aliases, theming por variáveis CSS e composição por `className` como padrão.
+
+## Mapeamento de capacidades já cobertas no ambiente
+
+- `audio-transcriber` cobre transcrição local e fluxo de Whisper, inclusive `openai-whisper`.
+- `magic-ui-generator` e `ui-ux-pro-max` cobrem geração e comparação de variações visuais para interfaces.
+- `reverse-skill`, `book-to-skill` e `i-have-adhd` passam a ser skills registradas no pacote oficial, com uso orientado por contexto e revisão.
 
 ---
 

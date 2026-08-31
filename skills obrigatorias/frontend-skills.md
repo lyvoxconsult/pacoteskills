@@ -17,6 +17,14 @@ Esta skill define os padrões operacionais para construir interfaces de altíssi
    - Aplique efeitos interativos hover e active coerentes (ex: leve alteração de opacidade, escala ou cor de fundo).
    - Use bibliotecas de animação de alta performance apenas quando justificado, mantendo a leveza do carregamento.
 
+3. **Fontes e bibliotecas de referência:**
+   - Use `ui.shadcn.com` como fonte principal para anatomia e implementação de componentes quando o stack suportar shadcn/ui.
+   - Use `21st.dev` para buscar variações visuais e padrões de layout quando a solução precisar sair do padrão genérico.
+   - Use `componentry.dev` como catálogo de blocos de interface reutilizáveis.
+   - Use `styles.refero.design` para buscar direção visual, combinações e referências de estilo antes de inventar um visual do zero.
+   - Trate essas fontes como baseline de pesquisa para velocidade, consistência e redução de retrabalho.
+   - Use `reference-first-ui` quando a tarefa for criar ou redesenhar interface e ainda não houver referência escolhida.
+
 ---
 
 ## 🛠️ Diretrizes de Estruturação e Boas Práticas

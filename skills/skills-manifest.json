@@ -95,6 +95,13 @@
       "compatibility": "${HOME}/.agents/skills/devpromptarchitect/SKILL.md"
     },
     {
+      "name": "reference-first-ui",
+      "required": "ui-reference-first-or-new-interface-work",
+      "status": "available-canonical-and-compatibility",
+      "canonical": "${HOME}/.codex/skills/reference-first-ui/SKILL.md",
+      "compatibility": "${HOME}/.agents/skills/reference-first-ui/SKILL.md"
+    },
+    {
       "name": "find-skills",
       "required": "always-after-mandatory-pack-for-skill-discovery",
       "status": "available-canonical-and-compatibility",

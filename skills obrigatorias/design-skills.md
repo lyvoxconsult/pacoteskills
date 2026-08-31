@@ -33,3 +33,9 @@ Esta skill especifica os guias conceituais e os padrões operacionais para a cri
 3. **Espaçamento e Grid (Bento Grid):**
    - Adote escalas de espaçamento fixas e proporcionais baseadas em 8px (ex: `8px`, `16px`, `24px`, `32px`, `48px`).
    - Utilize a estrutura de **Bento Grids** (layouts assimétricos compostos por cards auto-suficientes com bordas arredondadas e sombras suaves) para interfaces limpas e organizadas.
+
+4. **Referências visuais curadas:**
+   - Antes de criar um layout novo, revisar `ui.shadcn.com`, `21st.dev`, `componentry.dev` e `styles.refero.design`.
+   - Preferir adaptação de referências boas a reinvenção sem necessidade.
+   - Quando houver stack shadcn/ui, usar tokens, variantes e composição compatíveis com o ecossistema.
+   - A skill `reference-first-ui` deve ser usada como gatilho operacional para esse passo de consulta.
