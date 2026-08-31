@@ -9,7 +9,7 @@ domain: ia
 lifecycle: permanent
 status: active
 authority: canonical
-owner: "vibecoderconfigall"
+owner: "pacoteskills"
 sensitivity: internal
 confidence: high
 effective_at: 2026-07-06
@@ -26,7 +26,7 @@ tags:
 
 > **Regra:** Todo agente ou IDE DEVE carregar este pack antes de qualquer trabalho. As 10 skills são o baseline universal.
 
-> Estado observado em 2026-08-24: a skill de leitura de knowledge base interna está ausente e não deve ser simulada. `find-skills` é obrigatória como descoberta em todo pedido. `devpromptarchitect` continua obrigatória quando acionada pelas regras globais.
+> Estado observado em 2026-08-28: a skill de leitura de knowledge base interna está ausente e não deve ser simulada. `find-skills` é uma skill obrigatória adicional de descoberta em todo pedido. `devpromptarchitect` continua obrigatória quando acionada pelas regras globais.
 
 ---
 

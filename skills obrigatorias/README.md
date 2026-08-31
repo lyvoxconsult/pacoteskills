@@ -10,7 +10,7 @@ O arquivo canônico é [skills-manifest.json](skills-manifest.json). Ele registr
 ## Instalar apenas metadados
 
 ```bash
-./skills/install-skills.sh --target /opt/agent/skills
+./skills/install-skills.sh --target /opt/pacoteskills/skills
 ```
 
 ## Sincronizar conteúdo revisado
