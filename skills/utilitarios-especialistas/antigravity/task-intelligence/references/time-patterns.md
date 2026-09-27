@@ -10,7 +10,6 @@ Baseado em execuções reais do ecossistema.
 | Skill moderada (SKILL.md + 1-2 scripts) | 15-25 min | Ex: telegram, whatsapp |
 | Skill complexa (múltiplos scripts + refs) | 30-60 min | Ex: instagram (29 arquivos) |
 | Evolução de skill (v1→v2) | 20-40 min | Reescrever seções inteiras |
-| Ecossistema de skills relacionadas (5-6) | 2-4h | Ex: leiloeiro-ia + 5 módulos |
 
 ## Instalação e Infraestrutura
 

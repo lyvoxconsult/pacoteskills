@@ -1,6 +1,6 @@
 # 📦 Catálogo Geral de Skills Organizadas
 
-O diretório `skills/` reúne **1.500 skills operacionais**, organizadas em **categorias temáticas e hierarquia rasa** (máximo 1 a 2 níveis) para facilitar a localização visual e a navegação direta na sua IDE.
+O diretório `skills/` reúne **1.493 skills operacionais**, organizadas em **categorias temáticas e hierarquia rasa** (máximo 1 a 2 níveis) para facilitar a localização visual e a navegação direta na sua IDE.
 
 ---
 
@@ -66,4 +66,4 @@ O diretório `skills/` reúne **1.500 skills operacionais**, organizadas em **ca
 
 ---
 
-> **Status da Organização:** Total de `1500` skills distribuídas nas categorias acima, preservando 100% dos arquivos originais e seus manuais de instrução. A contagem exclui cópias de backup versionadas como skills independentes.
+> **Status da Organização:** Total de `1493` skills distribuídas nas categorias acima, preservando 100% dos arquivos originais e seus manuais de instrução. A contagem exclui cópias de backup versionadas como skills independentes.

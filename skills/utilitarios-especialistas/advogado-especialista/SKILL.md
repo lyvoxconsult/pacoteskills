@@ -1012,10 +1012,6 @@ OBSERVACOES: ___________
 | Situacao | Skill a Orquestrar |
 |----------|-------------------|
 | Crime, penal, Maria da Penha detalhado | `advogado-criminal` |
-| Leilao, arrematacao, execucao de imovel | `leiloeiro-juridico` + `leiloeiro-ia` |
-| Analise de edital de leilao | `leiloeiro-edital` |
-| Avaliacao de imovel | `leiloeiro-avaliacao` |
-| Risco de investimento em leilao | `leiloeiro-risco` |
 
 ---
 

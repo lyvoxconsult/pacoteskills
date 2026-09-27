@@ -292,7 +292,6 @@ python agent-orchestrator/scripts/scan_registry.py --status
 | Skill              | Capacidades                           | Status  |
 |:-------------------|:--------------------------------------|:--------|
 | web-scraper        | data-extraction, web-automation       | active  |
-| junta-leiloeiros   | government-data, data-extraction      | active  |
 | whatsapp-cloud-api | messaging, api-integration            | active  |
 | instagram          | social-media, api-integration         | partial |
 

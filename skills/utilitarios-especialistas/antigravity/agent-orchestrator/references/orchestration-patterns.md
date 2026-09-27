@@ -18,10 +18,10 @@ user_query -> Skill A (produtora) -> dados -> Skill B (consumidora) -> resultado
 ```
 
 ### Exemplo Concreto
-**Solicitacao:** "Coletar precos de leiloeiros de SP e enviar por WhatsApp"
+**Solicitacao:** "Coletar dados publicos de uma fonte governamental e enviar por WhatsApp"
 ```
-1. junta-leiloeiros: Executar scraper para SP, exportar dados
-2. whatsapp-cloud-api: Formatar dados como mensagem e enviar
+1. web-scraper: Coletar e exportar os dados públicos
+2. whatsapp-cloud-api: Formatar os dados como mensagem e enviar
 ```
 
 ### Regras de Contexto
@@ -80,10 +80,10 @@ user_query -> Skill A (primaria) ──────────────> res
 ```
 
 ### Exemplo Concreto
-**Solicitacao:** "Configurar chatbot WhatsApp para responder com dados de leiloeiros"
+**Solicitacao:** "Configurar chatbot WhatsApp para responder com dados públicos"
 ```
 1. (primaria) whatsapp-cloud-api: Configurar webhook e logica do chatbot
-2. (suporte) junta-leiloeiros: Fornecer endpoint/dados para o chatbot consultar
+2. (suporte) web-scraper: Fornecer os dados públicos para o chatbot consultar
 ```
 
 ### Regras de Contexto

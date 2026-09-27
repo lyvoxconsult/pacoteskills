@@ -249,7 +249,7 @@ def get_all_skill_dirs() -> list:
         skill_md = item / "SKILL.md"
         if skill_md.exists():
             dirs.append(item)
-        # Check nested (e.g., juntas-comerciais/junta-leiloeiros)
+        # Check nested skill directories.
         for child in item.iterdir():
             if child.is_dir() and (child / "SKILL.md").exists():
                 if child not in dirs:
@@ -1060,7 +1060,7 @@ def health_check() -> dict:
         checks["issues"] = issues
         results.append(checks)
 
-    # Also check nested skills (e.g., juntas-comerciais/junta-leiloeiros)
+    # Also check nested skills.
     for parent in SKILLS_ROOT.iterdir():
         if not parent.is_dir() or parent.name.startswith("."):
             continue

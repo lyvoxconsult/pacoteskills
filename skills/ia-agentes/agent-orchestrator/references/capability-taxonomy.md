@@ -11,7 +11,7 @@ Cada skill pode ter multiplas categorias.
 **Descricao:** Coleta e extracao de dados de fontes web ou APIs.
 **Keywords PT:** raspar, extrair, coletar, dados, tabela
 **Keywords EN:** scrape, extract, crawl, parse, harvest, collect, data, table, csv
-**Skills atuais:** web-scraper, junta-leiloeiros
+**Skills atuais:** web-scraper
 
 ### messaging
 **Descricao:** Envio e recebimento de mensagens via plataformas de comunicacao.
@@ -29,7 +29,7 @@ Cada skill pode ter multiplas categorias.
 **Descricao:** Coleta de dados governamentais, registros publicos, orgaos oficiais.
 **Keywords PT:** junta, leiloeiro, cadastro, governo, comercial, tribunal, certidao, registro
 **Keywords EN:** government, registry, official, court, public records
-**Skills atuais:** junta-leiloeiros
+**Skills atuais:** nenhuma skill específica cadastrada
 
 ### web-automation
 **Descricao:** Automacao de navegador, preenchimento de formularios, interacao com paginas.

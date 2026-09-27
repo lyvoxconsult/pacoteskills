@@ -239,7 +239,6 @@ Usuario pode customizar o board:
 → Board: elon-musk + sam-altman + 007
 
 "Board completo sobre o projeto leiloeiro"
-→ Board: todos + leiloeiro-ia + advogado-especialista
 ```
 
 ---
@@ -248,7 +247,6 @@ Usuario pode customizar o board:
 
 Esta skill usa as personas instaladas no ecossistema:
 - Ao consultar cada persona, adotar sua perspectiva COMPLETA (nao superficial)
-- Para questoes de leilao, incluir skills leiloeiro-* no board
 - Para questoes juridicas, incluir advogado-especialista
 - Para questoes de seguranca, incluir 007 e cred-omega
 - task-intelligence pode ser usado antes da consulta para briefing da questao

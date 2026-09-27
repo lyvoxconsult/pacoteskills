@@ -104,7 +104,6 @@ Para cada agente relevante identificado no match, faça uma pergunta direcionada
 - **matematico-tao (Complexidade)**: "Qual a complexidade computacional? Há otimizações não-óbvias?"
 - **context-guardian (Continuidade)**: "Existe contexto de sessões anteriores relevante para esta tarefa?"
 - **advogado-especialista/criminal (Legal)**: "Há implicações legais, LGPD, ou riscos regulatórios?"
-- **leiloeiro-ia (Leilões)**: "Esta tarefa envolve dados ou lógica do domínio de leilões?"
 
 Não consulte todos os agentes cegamente — escolha os **3-5 mais relevantes** para a tarefa.
 
