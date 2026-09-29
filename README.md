@@ -18,7 +18,7 @@ O foco é permitir que outro agente ou outra máquina consigam reconstruir o amb
 - `skills/`: catálogo principal de skills disponíveis.
 - `skills obrigatorias/`: definição do pack obrigatório, manifestos e documentação operacional.
 - `comercial/`: hub de skills e playbooks especializados para vendas, marketing, CRM e negócios.
-- `tokens/`: seleção curada de skills para economia severa de tokens, brevidade e entrega ágil de respostas.
+- `Ultra tokens/`: seleção curada e portátil de skills para economia de tokens, engenharia de prompt, contexto, raciocínio e entrega ágil.
 - `mcp/`: inventário de servidores MCP, plugins, conexões e templates de configuração.
 - `stack/`: documentação complementar de runtimes, frameworks e ferramentas importantes.
 - `graphify-out/`: artefatos locais de apoio à exploração estrutural do repositório quando gerados.
