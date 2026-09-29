@@ -1,0 +1,666 @@
+"""OpenAPI proxy launcher with health, metrics, auth, and rate limiting."""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import binascii
+import hmac
+import logging
+
+import os
+import sys
+import time
+from collections import deque
+from dataclasses import dataclass
+from typing import Any, Optional, cast
+
+import uvicorn
+from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, PlainTextResponse
+from mcpo.main import lifespan
+from starlette.middleware.base import BaseHTTPMiddleware
+
+from proxmox_mcp.observability import HttpRequestMetrics
+from proxmox_mcp.services.jobs import JobConflictError, JobNotFoundError
+from proxmox_mcp.security.sanitization import sanitize_string
+
+LOGGER = logging.getLogger(__name__)
+
+
+def _log_safe(value: object, max_length: int = 200) -> str:
+    return sanitize_string(value, max_length=max_length)
+
+
+def _parse_cors_allow_origins(value: Optional[str]) -> list[str]:
+    if not value:
+        return ["*"]
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _constant_time_equal(provided: str, expected: str) -> bool:
+    return hmac.compare_digest(
+        provided.encode("utf-8"),
+        expected.encode("utf-8"),
+    )
+
+
+@dataclass(frozen=True)
+class AuthFailure:
+    status_code: int
+    content: dict[str, str]
+    headers: dict[str, str] | None = None
+
+
+class ReadOnlyTargetError(PermissionError):
+    """Raised when a direct OpenAPI job mutation targets a read-only target."""
+
+
+def _verify_authorization_header(authorization: str | None, api_key: str) -> AuthFailure | None:
+    authenticate_headers = {"WWW-Authenticate": "Bearer, Basic"}
+    if not authorization:
+        return AuthFailure(
+            status.HTTP_401_UNAUTHORIZED,
+            {"detail": "Missing or invalid Authorization header"},
+            authenticate_headers,
+        )
+
+    scheme, separator, credentials = authorization.partition(" ")
+    if not separator or not credentials:
+        return AuthFailure(
+            status.HTTP_401_UNAUTHORIZED,
+            {"detail": "Missing or invalid Authorization header"},
+            authenticate_headers,
+        )
+
+    scheme = scheme.lower()
+    if scheme == "bearer":
+        if not _constant_time_equal(credentials, api_key):
+            return AuthFailure(status.HTTP_403_FORBIDDEN, {"detail": "Invalid API key"})
+        return None
+
+    if scheme == "basic":
+        try:
+            decoded = base64.b64decode(credentials, validate=True).decode("utf-8")
+            _, password = decoded.split(":", 1)
+        except (binascii.Error, UnicodeDecodeError, ValueError):
+            return AuthFailure(
+                status.HTTP_401_UNAUTHORIZED,
+                {"detail": "Invalid Basic Authentication format"},
+                authenticate_headers,
+            )
+        if not _constant_time_equal(password, api_key):
+            return AuthFailure(status.HTTP_403_FORBIDDEN, {"detail": "Invalid credentials"})
+        return None
+
+    return AuthFailure(
+        status.HTTP_401_UNAUTHORIZED,
+        {"detail": "Unsupported authorization method"},
+        authenticate_headers,
+    )
+
+
+def _get_verify_api_key(api_key: str):
+    async def verify_api_key(request: Request) -> None:
+        failure = _verify_authorization_header(request.headers.get("Authorization"), api_key)
+        if failure is not None:
+            raise HTTPException(
+                status_code=failure.status_code,
+                detail=failure.content["detail"],
+                headers=failure.headers,
+            )
+
+    return verify_api_key
+
+
+def _security_warnings(*, api_key: Optional[str], strict_auth: bool, cors_allow_origins: list[str]) -> list[str]:
+    warnings: list[str] = []
+    if not api_key:
+        warnings.append("OpenAPI proxy is running without PROXMOX_API_KEY.")
+    if api_key and not strict_auth:
+        warnings.append("PROXMOX_API_KEY is configured but PROXMOX_STRICT_AUTH is disabled.")
+    if not api_key and os.getenv("PROXMOX_ALLOW_NO_AUTH", "false").lower() == "true":
+        warnings.append(
+            "PROXMOX_ALLOW_NO_AUTH=true is set; OpenAPI proxy is running without an API key."
+        )
+    if "*" in cors_allow_origins:
+        warnings.append("CORS allows all origins; set MCPO_CORS_ALLOW_ORIGINS for production.")
+    return warnings
+
+
+def _close_job_resources(job_stores: dict[str, Any], managers: list[Any]) -> None:
+    """Close proxy-owned job resources without masking an earlier failure."""
+    for target, job_store in job_stores.items():
+        try:
+            job_store.close()
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.warning("Failed to close JobStore for target %s: %s", _log_safe(target), _log_safe(exc))
+    for manager in managers:
+        try:
+            manager.close()
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.warning("Failed to close Proxmox manager: %s", _log_safe(exc))
+
+
+class ProxyMetricsMiddleware(BaseHTTPMiddleware):
+    """Capture basic per-route request metrics."""
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        metrics: HttpRequestMetrics = request.app.state.http_metrics
+        start = time.perf_counter()
+        response = None
+        try:
+            response = await call_next(request)
+            return response
+        finally:
+            latency_ms = (time.perf_counter() - start) * 1000.0
+            status_code = response.status_code if response is not None else 500
+            route = request.scope.get("route")
+            route_path = getattr(route, "path", None) or request.url.path
+            metrics.observe(route_path, request.method, status_code, latency_ms)
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """Simple fixed-window in-memory rate limiter per client address."""
+
+    _SWEEP_INTERVAL = 256
+
+    def __init__(self, app: FastAPI, *, requests_per_minute: int) -> None:
+        super().__init__(app)
+        self.requests_per_minute = requests_per_minute
+        self._buckets: dict[str, deque[float]] = {}
+        self._requests_seen = 0
+
+    def _sweep_buckets(self, window_start: float) -> None:
+        for client_host, bucket in list(self._buckets.items()):
+            while bucket and bucket[0] < window_start:
+                bucket.popleft()
+            if not bucket:
+                self._buckets.pop(client_host, None)
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        if self.requests_per_minute <= 0:
+            return await call_next(request)
+
+        client_host = request.client.host if request.client else "unknown"
+        now = time.time()
+        window_start = now - 60.0
+        bucket = self._buckets.setdefault(client_host, deque())
+        while bucket and bucket[0] < window_start:
+            bucket.popleft()
+        self._requests_seen += 1
+        if self._requests_seen % self._SWEEP_INTERVAL == 0:
+            self._sweep_buckets(window_start)
+
+        if len(bucket) >= self.requests_per_minute:
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "status": "rate_limited",
+                    "message": "Too many requests",
+                    "limit_per_minute": self.requests_per_minute,
+                },
+            )
+
+        bucket.append(now)
+        return await call_next(request)
+
+
+class OpenAPIAuthMiddleware(BaseHTTPMiddleware):
+    """Enforce Bearer or Basic API key auth with constant-time token comparison."""
+
+    EXEMPT_PATHS = {"/livez"}
+
+    def __init__(self, app: Any, *, api_key: str) -> None:
+        super().__init__(app)
+        self.api_key = api_key
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        if request.method == "OPTIONS" or request.url.path in self.EXEMPT_PATHS:
+            return await call_next(request)
+
+        failure = _verify_authorization_header(request.headers.get("Authorization"), self.api_key)
+        if failure is not None:
+            return JSONResponse(
+                status_code=failure.status_code,
+                content=failure.content,
+                headers=failure.headers,
+            )
+        return await call_next(request)
+
+
+def create_app(
+    server_command: list[str],
+    *,
+    api_key: Optional[str],
+    strict_auth: bool,
+    cors_allow_origins: list[str],
+    job_store: Any | None = None,
+    job_stores: dict[str, Any] | None = None,
+    name: str = "MCP OpenAPI Proxy",
+    description: str = "Automatically generated API from MCP Tool Schemas",
+    version: str = "1.0",
+    path_prefix: str = "/",
+    root_path: str = "",
+    rate_limit_rpm: int = 0,
+    command_policy: Any | None = None,
+    command_policies: dict[str, Any] | None = None,
+    target_readonly: dict[str, bool] | None = None,
+) -> FastAPI:
+    """Create a FastAPI app that mirrors mcpo behavior and adds ops routes."""
+    api_dependency = _get_verify_api_key(api_key) if api_key else None
+
+    configured_job_stores = dict(job_stores or {})
+    if job_store is not None:
+        existing = configured_job_stores.get("default")
+        if existing is not None and existing is not job_store:
+            raise ValueError("Conflicting default JobStore configuration")
+        configured_job_stores["default"] = job_store
+
+    configured_policies = dict(command_policies or {})
+    if command_policy is not None and configured_job_stores:
+        if len(configured_job_stores) > 1 and not configured_policies:
+            raise ValueError("Multiple JobStores require target-specific command policies")
+        policy_target = next(iter(configured_job_stores), "default")
+        existing = configured_policies.get(policy_target)
+        if existing is not None and existing is not command_policy:
+            raise ValueError(f"Conflicting command policy for target {policy_target!r}")
+        configured_policies[policy_target] = command_policy
+
+    configured_readonly = dict(target_readonly or {})
+    unknown_context_targets = (
+        set(configured_policies) | set(configured_readonly)
+    ) - set(configured_job_stores)
+    if unknown_context_targets:
+        names = ", ".join(sorted(unknown_context_targets))
+        raise ValueError(f"OpenAPI job context references unknown target(s): {names}")
+
+    legacy_job_store = job_store
+    if legacy_job_store is None and len(configured_job_stores) == 1:
+        legacy_job_store = next(iter(configured_job_stores.values()))
+
+    app = FastAPI(
+        title=name,
+        description=description,
+        version=version,
+        root_path=root_path,
+        lifespan=lifespan,
+    )
+
+    app.state.started_at = time.time()
+    app.state.http_metrics = HttpRequestMetrics()
+    app.state.rate_limit_rpm = rate_limit_rpm
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_allow_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    if api_key and strict_auth:
+        app.add_middleware(OpenAPIAuthMiddleware, api_key=api_key)
+    if rate_limit_rpm > 0:
+        app.add_middleware(cast(Any, RateLimitMiddleware), requests_per_minute=rate_limit_rpm)
+    app.add_middleware(ProxyMetricsMiddleware)
+
+    app.state.path_prefix = path_prefix
+    app.state.server_type = "stdio"
+    app.state.command = server_command[0]
+    app.state.args = server_command[1:]
+    app.state.env = os.environ.copy()
+    app.state.api_dependency = api_dependency
+    app.state.api_key_configured = bool(api_key)
+    app.state.strict_auth = strict_auth
+    app.state.job_stores = configured_job_stores
+    app.state.job_store = legacy_job_store
+    app.state.command_policies = configured_policies
+    app.state.command_policy = command_policy
+    app.state.target_readonly = configured_readonly
+    app.state.security_warnings = _security_warnings(
+        api_key=api_key,
+        strict_auth=strict_auth,
+        cors_allow_origins=cors_allow_origins,
+    )
+    job_auth_dependencies = [Depends(api_dependency)] if api_dependency and not strict_auth else []
+
+    @app.get("/", include_in_schema=False)
+    async def root() -> dict[str, str]:
+        return {
+            "name": name,
+            "status": "ok",
+            "docs": "/docs",
+            "openapi": "/openapi.json",
+            "health": "/health",
+            "livez": "/livez",
+            "readyz": "/readyz",
+            "metrics": "/metrics",
+            "jobs": "/jobs",
+        }
+
+    def _readiness_response() -> JSONResponse:
+        is_connected = bool(getattr(app.state, "is_connected", False))
+        uptime_seconds = round(time.time() - app.state.started_at, 3)
+        status_code = 200 if is_connected else 503
+        return JSONResponse(
+            status_code=status_code,
+            content={
+                "status": "ok" if is_connected else "degraded",
+                "connected_to_mcp": is_connected,
+                "uptime_seconds": uptime_seconds,
+                "server_type": app.state.server_type,
+                "command": app.state.command,
+                "args": app.state.args,
+                "auth": {
+                    "api_key_configured": app.state.api_key_configured,
+                    "strict_auth": app.state.strict_auth,
+                },
+                "rate_limit": {
+                    "enabled": app.state.rate_limit_rpm > 0,
+                    "requests_per_minute": app.state.rate_limit_rpm,
+                },
+                "jobs": {
+                    "enabled": bool(app.state.job_stores),
+                },
+                "security_warnings": app.state.security_warnings,
+            },
+        )
+
+    @app.get("/livez", include_in_schema=False)
+    async def livez() -> dict[str, str]:
+        return {"status": "ok"}
+
+    @app.get("/readyz", include_in_schema=False)
+    async def readyz() -> JSONResponse:
+        return _readiness_response()
+
+    @app.get("/health", include_in_schema=False)
+    async def health() -> JSONResponse:
+        return _readiness_response()
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics() -> PlainTextResponse:
+        return PlainTextResponse(
+            app.state.http_metrics.render_prometheus(),
+            media_type="text/plain; version=0.0.4",
+        )
+
+    def _require_job_store(target: Optional[str]) -> tuple[str, Any]:
+        stores = getattr(app.state, "job_stores", {})
+        if not stores:
+            raise RuntimeError("JobStore is not available in this OpenAPI process")
+        if target is not None:
+            try:
+                return target, stores[target]
+            except KeyError as exc:
+                raise ValueError(f"Unknown Proxmox target {target!r}") from exc
+        if len(stores) == 1:
+            return next(iter(stores.items()))
+        raise ValueError("Multiple Proxmox targets are configured; specify target")
+
+    def _job_error_response(error: Exception) -> JSONResponse:
+        LOGGER.warning("Job route error: %s", _log_safe(error))
+        if isinstance(error, JobNotFoundError):
+            return JSONResponse(status_code=404, content={"status": "not_found", "message": "Job was not found"})
+        if isinstance(error, ReadOnlyTargetError):
+            return JSONResponse(status_code=403, content={"status": "forbidden", "message": "Target is read-only"})
+        if isinstance(error, PermissionError):
+            return JSONResponse(status_code=403, content={"status": "forbidden", "message": "Job operation requires approval"})
+        if isinstance(error, JobConflictError):
+            return JSONResponse(status_code=409, content={"status": "conflict", "message": "Job cannot perform that operation right now"})
+        if isinstance(error, RuntimeError):
+            return JSONResponse(status_code=503, content={"status": "unavailable", "message": "Job service is unavailable in this process"})
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Job request failed"})
+
+    def _enforce_target_mutation(target: str) -> None:
+        if getattr(app.state, "target_readonly", {}).get(target, False):
+            raise ReadOnlyTargetError(f"Target {target!r} is configured read-only")
+
+    def _enforce_job_retry_policy(
+        target: str,
+        job_store_local: Any,
+        job_id: str,
+        approval_token: Optional[str],
+    ) -> None:
+        policy = getattr(app.state, "command_policies", {}).get(target)
+        if policy is None:
+            return
+        job = job_store_local.get_job(job_id)
+        operation_name = str(job.get("tool_name") or "")
+        decision = policy.evaluate_operation(
+            operation_name,
+            approval_token=approval_token,
+        )
+        if decision.code == "OP_POLICY_AUDIT_ALLOW":
+            safe_job_id = _log_safe(job_id)
+            safe_operation_name = _log_safe(operation_name)
+            LOGGER.warning(
+                "Retrying high-risk job in audit-only mode: %s (%s)",
+                safe_job_id,
+                safe_operation_name,
+            )
+        if not decision.allowed:
+            raise PermissionError(decision.message)
+
+    @app.get("/jobs", dependencies=job_auth_dependencies)
+    async def list_jobs(
+        status: Optional[str] = None,
+        tool_name: Optional[str] = None,
+        limit: int = 100,
+        target: Optional[str] = None,
+    ) -> JSONResponse:
+        try:
+            _, job_store_local = _require_job_store(target)
+            payload = job_store_local.list_jobs(status=status, tool_name=tool_name, limit=limit)
+            return JSONResponse(status_code=200, content=payload)
+        except Exception as exc:  # noqa: BLE001
+            return _job_error_response(exc)
+
+    @app.get("/jobs/{job_id}", dependencies=job_auth_dependencies)
+    async def get_job(job_id: str, refresh: bool = False, target: Optional[str] = None) -> JSONResponse:
+        try:
+            _, job_store_local = _require_job_store(target)
+            payload = job_store_local.poll_job(job_id) if refresh else job_store_local.get_job(job_id)
+            return JSONResponse(status_code=200, content=payload)
+        except Exception as exc:  # noqa: BLE001
+            return _job_error_response(exc)
+
+    @app.post("/jobs/{job_id}/poll", dependencies=job_auth_dependencies)
+    async def poll_job(job_id: str, target: Optional[str] = None) -> JSONResponse:
+        try:
+            _, job_store_local = _require_job_store(target)
+            payload = job_store_local.poll_job(job_id)
+            return JSONResponse(status_code=200, content=payload)
+        except Exception as exc:  # noqa: BLE001
+            return _job_error_response(exc)
+
+    @app.post("/jobs/{job_id}/cancel", dependencies=job_auth_dependencies)
+    async def cancel_job(job_id: str, target: Optional[str] = None) -> JSONResponse:
+        try:
+            target_name, job_store_local = _require_job_store(target)
+            _enforce_target_mutation(target_name)
+            payload = job_store_local.cancel_job(job_id)
+            return JSONResponse(status_code=202, content=payload)
+        except Exception as exc:  # noqa: BLE001
+            return _job_error_response(exc)
+
+    @app.post("/jobs/{job_id}/retry", dependencies=job_auth_dependencies)
+    async def retry_job(
+        job_id: str,
+        approval_token: Optional[str] = None,
+        target: Optional[str] = None,
+    ) -> JSONResponse:
+        try:
+            target_name, job_store_local = _require_job_store(target)
+            _enforce_target_mutation(target_name)
+            _enforce_job_retry_policy(target_name, job_store_local, job_id, approval_token)
+            payload = job_store_local.retry_job(job_id)
+            return JSONResponse(status_code=202, content=payload)
+        except Exception as exc:  # noqa: BLE001
+            return _job_error_response(exc)
+
+    return app
+
+
+def main() -> None:
+    """Run OpenAPI proxy as a uvicorn server."""
+    parser = argparse.ArgumentParser(description="Run Proxmox MCP OpenAPI proxy")
+    parser.add_argument("--host", default=os.getenv("API_HOST", "0.0.0.0"))
+    parser.add_argument("--port", type=int, default=int(os.getenv("API_PORT", "8811")))
+    parser.add_argument("--api-key", default=os.getenv("PROXMOX_API_KEY"))
+    parser.add_argument(
+        "--strict-auth",
+        action="store_true",
+        default=os.getenv("PROXMOX_STRICT_AUTH", "false").lower() == "true",
+    )
+    parser.add_argument(
+        "--cors-allow-origins",
+        default=os.getenv("MCPO_CORS_ALLOW_ORIGINS", "*"),
+    )
+    parser.add_argument(
+        "--path-prefix",
+        default=os.getenv("MCPO_PATH_PREFIX", "/"),
+    )
+    parser.add_argument(
+        "--root-path",
+        default=os.getenv("MCPO_ROOT_PATH", ""),
+    )
+    parser.add_argument(
+        "--rate-limit-rpm",
+        type=int,
+        default=int(os.getenv("PROXMOX_RATE_LIMIT_RPM", "0")),
+        help="Maximum requests per minute per client IP. 0 disables rate limiting.",
+    )
+    parser.add_argument(
+        "server_command",
+        nargs=argparse.REMAINDER,
+        help="Command after '--' used to launch MCP stdio server",
+    )
+
+    args = parser.parse_args()
+    server_command = args.server_command
+    if server_command and server_command[0] == "--":
+        server_command = server_command[1:]
+
+    if not server_command:
+        parser.error("Missing MCP server command. Use '-- <command>' to pass it.")
+
+    # Refuse to start with broken auth.
+    #
+    # Two surprising defaults existed in the previous behaviour:
+    #   1. The proxy could start with no API key at all and would just log a
+    #      warning. Anyone reaching the listener could call the MCP tools.
+    #   2. The APIKeyMiddleware was only installed when both `api_key` was set
+    #      AND `strict_auth=True`. `strict_auth` defaults to False, so setting
+    #      PROXMOX_API_KEY alone gave the operator a false sense of security:
+    #      auth was loaded but not enforced.
+    #
+    # Both are now hard errors / auto-fixed at startup. Operators who actually
+    # want unauthenticated access (e.g. local development behind another
+    # reverse proxy) must opt in with PROXMOX_ALLOW_NO_AUTH=true.
+    allow_no_auth = os.getenv("PROXMOX_ALLOW_NO_AUTH", "false").lower() == "true"
+    if not args.api_key and not allow_no_auth:
+        LOGGER.error(
+            "OpenAPI proxy refuses to start without PROXMOX_API_KEY. "
+            "Set PROXMOX_ALLOW_NO_AUTH=true to override (NOT RECOMMENDED)."
+        )
+        sys.exit(1)
+    if args.api_key and not args.strict_auth:
+        LOGGER.info(
+            "PROXMOX_API_KEY is set; auto-enabling strict auth. "
+            "Set PROXMOX_STRICT_AUTH=true to silence this message."
+        )
+        args.strict_auth = True
+
+    LOGGER.info(
+        "Starting OpenAPI proxy on %s:%s with command: %s",
+        args.host,
+        args.port,
+        " ".join(server_command),
+    )
+
+    security_warnings = _security_warnings(
+        api_key=args.api_key,
+        strict_auth=args.strict_auth,
+        cors_allow_origins=_parse_cors_allow_origins(args.cors_allow_origins),
+    )
+    for warning in security_warnings:
+        LOGGER.warning("OpenAPI security warning: %s", warning)
+
+    job_stores: dict[str, Any] = {}
+    command_policies: dict[str, Any] = {}
+    target_readonly: dict[str, bool] = {}
+    proxmox_managers: list[Any] = []
+    config = None
+    config_path = os.getenv("PROXMOX_MCP_CONFIG")
+    if config_path:
+        try:
+            from proxmox_mcp.config.loader import load_config
+            from proxmox_mcp.core.proxmox import ProxmoxManager
+            from proxmox_mcp.core.targets import TargetRegistry
+            from proxmox_mcp.security import CommandPolicyGate
+            from proxmox_mcp.services import JobStore, target_job_sqlite_path
+
+            config = load_config(config_path)
+            target_registry = TargetRegistry(config)
+            for target_name in target_registry.names:
+                target = target_registry.resolve(target_name)
+                manager = ProxmoxManager(
+                    target.config,
+                    target.auth,
+                    api_tunnel_config=target.api_tunnel,
+                    ssh_config=target.ssh,
+                    # The MCP subprocess owns managed tunnels. The proxy uses
+                    # the same local endpoints without spawning a competing
+                    # process that the subprocess would correctly reject.
+                    manage_api_tunnel=False,
+                )
+                proxmox_managers.append(manager)
+                sqlite_path = (
+                    config.jobs.sqlite_path
+                    if target_registry.is_legacy
+                    else target_job_sqlite_path(config.jobs.sqlite_path, target_name)
+                )
+                job_stores[target_name] = JobStore(
+                    manager.get_api(),
+                    sqlite_path=sqlite_path,
+                    target_name=target_name,
+                    legacy_mode=target_registry.is_legacy,
+                    audit_retention_days=config.jobs.audit_retention_days,
+                )
+                command_policies[target_name] = CommandPolicyGate(
+                    target.command_policy or config.command_policy
+                )
+                target_readonly[target_name] = target.readonly
+        except Exception as exc:  # noqa: BLE001
+            if config is not None and config.targets:
+                _close_job_resources(job_stores, proxmox_managers)
+                raise
+            LOGGER.warning("JobStore initialization skipped in OpenAPI proxy: %s", _log_safe(exc))
+            _close_job_resources(job_stores, proxmox_managers)
+            job_stores.clear()
+            command_policies.clear()
+            target_readonly.clear()
+            proxmox_managers.clear()
+
+    try:
+        app = create_app(
+            server_command=server_command,
+            api_key=args.api_key,
+            strict_auth=args.strict_auth,
+            cors_allow_origins=_parse_cors_allow_origins(args.cors_allow_origins),
+            job_stores=job_stores,
+            path_prefix=args.path_prefix,
+            root_path=args.root_path,
+            rate_limit_rpm=args.rate_limit_rpm,
+            command_policies=command_policies,
+            target_readonly=target_readonly,
+        )
+        uvicorn.run(app, host=args.host, port=args.port)
+    finally:
+        _close_job_resources(job_stores, proxmox_managers)
+
+
+if __name__ == "__main__":
+    main()

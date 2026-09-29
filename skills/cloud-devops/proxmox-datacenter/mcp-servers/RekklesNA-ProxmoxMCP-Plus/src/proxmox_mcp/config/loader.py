@@ -1,0 +1,262 @@
+"""
+Configuration loading utilities for the Proxmox MCP server.
+
+This module handles loading and validation of server configuration:
+- JSON configuration file loading
+- Environment variable handling
+- Configuration validation using Pydantic models
+- Error handling for invalid configurations
+
+The module ensures that all required configuration is present
+and valid before the server starts operation.
+"""
+import json
+import os
+from typing import Any, Dict, Optional
+from proxmox_mcp.config.models import Config
+
+
+def _parse_csv_env(name: str) -> list[str] | None:
+    if name not in os.environ:
+        return None
+    return [item.strip() for item in os.environ[name].split(",") if item.strip()]
+
+
+def _parse_tool_filter_env(name: str) -> list[str] | None:
+    """Accept an explicitly empty filter, but reject malformed CSV entries."""
+    value = os.environ.get(name)
+    if value is None:
+        return None
+    if not value.strip():
+        return []
+    entries = [item.strip() for item in value.split(",")]
+    if any(not item for item in entries):
+        raise ValueError(f"{name} must not contain empty CSV entries")
+    return entries
+
+
+def _parse_bool_env(name: str) -> bool | None:
+    if name not in os.environ:
+        return None
+    value = os.environ[name].strip().lower()
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be a boolean value")
+
+
+def _bool_env(name: str, default: bool = False) -> bool:
+    value = _parse_bool_env(name)
+    return default if value is None else value
+
+
+def _apply_mcp_env_overrides(config_data: Dict[str, Any]) -> None:
+    """Allow deployment-specific MCP transport settings to override file config."""
+    env_map = {
+        "MCP_HOST": ("host", str),
+        "MCP_PORT": ("port", int),
+        "MCP_TRANSPORT": ("transport", str),
+    }
+    overrides = {
+        key: (coerce(os.environ[env_name]) if coerce is not str else os.environ[env_name])
+        for env_name, (key, coerce) in env_map.items()
+        if env_name in os.environ
+    }
+    allow_unauthenticated = _parse_bool_env("MCP_ALLOW_UNAUTHENTICATED_HTTP")
+    if allow_unauthenticated is not None:
+        overrides["allow_unauthenticated_http"] = allow_unauthenticated
+    if "MCP_CODE_MODE" in os.environ:
+        overrides["code_mode"] = _bool_env("MCP_CODE_MODE")
+    if "MCP_CODE_MODE_POOL_REUSE" in os.environ:
+        overrides["code_mode_pool_reuse"] = _bool_env("MCP_CODE_MODE_POOL_REUSE")
+    dns_rebinding_protection = _parse_bool_env("MCP_DNS_REBINDING_PROTECTION")
+    if dns_rebinding_protection is not None:
+        overrides["dns_rebinding_protection"] = dns_rebinding_protection
+    allowed_hosts = _parse_csv_env("MCP_ALLOWED_HOSTS")
+    if allowed_hosts is not None:
+        overrides["allowed_hosts"] = allowed_hosts
+    allowed_origins = _parse_csv_env("MCP_ALLOWED_ORIGINS")
+    if allowed_origins is not None:
+        overrides["allowed_origins"] = allowed_origins
+
+    tool_allowlist_present = "MCP_TOOL_ALLOWLIST" in os.environ
+    tool_denylist_present = "MCP_TOOL_DENYLIST" in os.environ
+    if tool_allowlist_present and tool_denylist_present:
+        raise ValueError(
+            "MCP_TOOL_ALLOWLIST and MCP_TOOL_DENYLIST are mutually exclusive"
+        )
+    if tool_allowlist_present:
+        overrides["tool_allowlist"] = _parse_tool_filter_env("MCP_TOOL_ALLOWLIST")
+        # Environment selection replaces the complete file-level filter mode.
+        overrides["tool_denylist"] = None
+    elif tool_denylist_present:
+        overrides["tool_denylist"] = _parse_tool_filter_env("MCP_TOOL_DENYLIST")
+        overrides["tool_allowlist"] = None
+
+    if not overrides:
+        return
+
+    mcp_config = config_data.setdefault("mcp", {})
+    if not isinstance(mcp_config, dict):
+        raise ValueError("mcp config must be a JSON object when MCP_* overrides are used")
+
+    if "transport" in overrides and isinstance(overrides["transport"], str):
+        overrides["transport"] = overrides["transport"].strip().upper()
+    mcp_config.update(overrides)
+
+
+def load_config(config_path: Optional[str] = None) -> Config:
+    """Load and validate configuration from JSON file.
+
+    Performs the following steps:
+    1. Verifies config path is provided
+    2. Loads JSON configuration file
+    3. Validates required fields are present
+    4. Converts to typed Config object using Pydantic
+
+    Configuration must include:
+    - Proxmox connection settings (host, port, etc.)
+    - Authentication credentials (user, token)
+    - Logging configuration
+
+    Args:
+        config_path: Path to the JSON configuration file
+                    If not provided, raises ValueError
+
+    Returns:
+        Config object containing validated configuration:
+        {
+            "proxmox": {
+                "host": "proxmox-host",
+                "port": 8006,
+                ...
+            },
+            "auth": {
+                "user": "username",
+                "token_name": "token-name",
+                ...
+            },
+            "logging": {
+                "level": "INFO",
+                ...
+            }
+        }
+
+    Raises:
+        ValueError: If:
+                 - Config path is not provided
+                 - JSON is invalid
+                 - Required fields are missing
+                 - Field values are invalid
+    """
+    config_data: Dict[str, Any]
+    if not config_path or not os.path.exists(config_path):
+        # Fallback to environment variables
+        log_level_raw = os.getenv("LOG_LEVEL")
+        command_policy = {
+            'mode': os.getenv("COMMAND_POLICY_MODE", "deny_all"),
+            'allow_patterns': _parse_csv_env("COMMAND_POLICY_ALLOW_PATTERNS") or [],
+            'require_approval_token': _bool_env("COMMAND_POLICY_REQUIRE_APPROVAL_TOKEN"),
+            'approval_token': os.getenv("COMMAND_POLICY_APPROVAL_TOKEN"),
+            'high_risk_mode': os.getenv("COMMAND_POLICY_HIGH_RISK_MODE", "audit_only"),
+            'high_risk_require_approval_token': _bool_env("COMMAND_POLICY_HIGH_RISK_REQUIRE_APPROVAL_TOKEN"),
+            'high_risk_approval_token': os.getenv("COMMAND_POLICY_HIGH_RISK_APPROVAL_TOKEN"),
+        }
+        deny_patterns = _parse_csv_env("COMMAND_POLICY_DENY_PATTERNS")
+        if deny_patterns is not None:
+            command_policy["deny_patterns"] = deny_patterns
+        high_risk_operations = _parse_csv_env("COMMAND_POLICY_HIGH_RISK_OPERATIONS")
+        if high_risk_operations is not None:
+            command_policy["high_risk_operations"] = high_risk_operations
+
+        config_data = {
+            'proxmox': {
+                'host': os.getenv("PROXMOX_HOST"),
+                'port': int(os.getenv("PROXMOX_PORT", "8006")),
+                'timeout': int(os.getenv("PROXMOX_TIMEOUT", "30")),
+                'verify_ssl': _bool_env("PROXMOX_VERIFY_SSL", True),
+                'service': os.getenv("PROXMOX_SERVICE", "PVE")
+            },
+            'auth': {
+                'user': os.getenv("PROXMOX_USER"),
+                'token_name': os.getenv("PROXMOX_TOKEN_NAME"),
+                'token_value': os.getenv("PROXMOX_TOKEN_VALUE")
+            },
+            'api_tunnel': {
+                'enabled': _bool_env("PROXMOX_API_TUNNEL_ENABLED"),
+                'ssh_host': os.getenv("PROXMOX_API_TUNNEL_SSH_HOST"),
+                'local_host': os.getenv("PROXMOX_API_TUNNEL_LOCAL_HOST", "127.0.0.1"),
+                'local_port': int(os.getenv("PROXMOX_API_TUNNEL_LOCAL_PORT", os.getenv("PROXMOX_PORT", "8006"))),
+                'remote_host': os.getenv("PROXMOX_API_TUNNEL_REMOTE_HOST", "127.0.0.1"),
+                'remote_port': int(os.getenv("PROXMOX_API_TUNNEL_REMOTE_PORT", "8006")),
+                'connect_timeout': int(os.getenv("PROXMOX_API_TUNNEL_CONNECT_TIMEOUT", "15")),
+            },
+            'logging': {
+                'level': log_level_raw.upper() if log_level_raw and not log_level_raw.startswith("${") else "INFO"
+            },
+            'mcp': {
+                'host': os.getenv("MCP_HOST", "0.0.0.0"),
+                'port': int(os.getenv("MCP_PORT", "8000")),
+                'transport': os.getenv("MCP_TRANSPORT", "stdio").upper() if os.getenv("MCP_TRANSPORT") else "STDIO",
+            },
+            'security': {
+                'dev_mode': _bool_env("PROXMOX_DEV_MODE"),
+            },
+            'jobs': {
+                'sqlite_path': os.getenv("PROXMOX_JOBS_SQLITE_PATH", "proxmox-jobs.sqlite3"),
+            },
+            'command_policy': command_policy,
+        }
+
+        api_tunnel_config = config_data.get("api_tunnel")
+        if isinstance(api_tunnel_config, dict) and not api_tunnel_config.get("ssh_host"):
+            config_data.pop("api_tunnel", None)
+    else:
+        try:
+            with open(config_path) as f:
+                config_data = json.load(f)
+                if not isinstance(config_data, dict):
+                    raise ValueError("Config root must be a JSON object")
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in config file: {e}")
+        except Exception as e:
+            raise ValueError(f"Failed to load config: {e}")
+
+    _apply_mcp_env_overrides(config_data)
+
+    # Final validation check
+    if config_data.get("targets") is not None:
+        targets = config_data.get("targets")
+        if not isinstance(targets, dict) or not targets:
+            raise ValueError("At least one Proxmox target must be configured")
+        for name, target in targets.items():
+            if not isinstance(target, dict) or not target.get("host"):
+                raise ValueError(f"Proxmox target {name!r} must provide a host")
+            auth = target.get("auth")
+            if not isinstance(auth, dict) or not auth.get("user"):
+                raise ValueError(f"Proxmox target {name!r} must provide authentication credentials")
+    else:
+        if not config_data.get('proxmox', {}).get('host'):
+            raise ValueError("Proxmox host must be provided (via config file or PROXMOX_HOST env var)")
+        if not config_data.get('auth', {}).get('user'):
+            raise ValueError("Authentication credentials must be provided")
+
+    try:
+        config = Config.model_validate(config_data)
+        if config.targets is not None:
+            insecure = [name for name, target in config.targets.items() if not target.verify_ssl and not target.allow_insecure_tls]
+            if insecure:
+                raise ValueError(
+                    "Insecure TLS configuration blocked for target(s): "
+                    + ", ".join(insecure)
+                    + ". Set verify_ssl=true or enable allow_insecure_tls for that target."
+                )
+        elif config.proxmox is not None and not config.proxmox.verify_ssl and not config.security.dev_mode:
+            raise ValueError(
+                "Insecure TLS configuration blocked: set proxmox.verify_ssl=true. "
+                "Only dev_mode=true can allow verify_ssl=false."
+            )
+        return config
+    except Exception as e:
+        raise ValueError(f"Configuration validation failed: {e}")

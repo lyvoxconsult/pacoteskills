@@ -1,0 +1,446 @@
+"""
+Main server implementation for Proxmox MCP.
+
+This module wires configuration, Proxmox connectivity, observability, policy
+controls, and pluggable MCP tool registration together.
+"""
+
+from __future__ import annotations
+
+import os
+import signal
+import sys
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+from typing import Any, Literal, NoReturn, Optional, cast
+from types import SimpleNamespace
+
+from mcp.server.fastmcp import FastMCP
+from proxmox_mcp.config.loader import load_config
+from proxmox_mcp.core.logging import setup_logging
+from proxmox_mcp.core.proxmox import ProxmoxManager
+from proxmox_mcp.code_mode import CodeMode, install_code_mode
+from proxmox_mcp.core.targets import TargetRegistry
+from proxmox_mcp.mcp_http_auth import MCPBearerAuthMiddleware
+from proxmox_mcp.mcp_oauth_provider import build_oauth_from_env
+from proxmox_mcp.observability import ToolMetrics
+from proxmox_mcp.security import CommandPolicyGate
+from proxmox_mcp.services import (
+    BUILTIN_TOOL_NAMES,
+    JobStore,
+    ToolExposurePolicy,
+    ToolRegistry,
+    target_job_sqlite_path,
+)
+from proxmox_mcp.services.builtin_tool_plugins import (
+    BackupToolsPlugin,
+    ContainerToolsPlugin,
+    CoreToolsPlugin,
+    ImageToolsPlugin,
+    JobsToolsPlugin,
+    LogToolsPlugin,
+    SnapshotToolsPlugin,
+    VMToolsPlugin,
+)
+from proxmox_mcp.tools.backup import BackupTools
+from proxmox_mcp.tools.cluster import ClusterTools
+from proxmox_mcp.tools.containers import ContainerTools
+from proxmox_mcp.tools.iso import ISOTools
+from proxmox_mcp.tools.jobs import JobsTools
+from proxmox_mcp.tools.logs import LogTools
+from proxmox_mcp.tools.node import NodeTools
+from proxmox_mcp.tools.snapshots import SnapshotTools
+from proxmox_mcp.tools.storage import StorageTools
+from proxmox_mcp.tools.vm import VMTools
+
+TransportSecuritySettings: Any
+try:
+    from mcp.server.transport_security import TransportSecuritySettings
+except ImportError:  # pragma: no cover - exercised only with older MCP SDKs
+    TransportSecuritySettings = None
+
+
+def _log_safe(value: object, max_length: int = 200) -> str:
+    text = str(value).replace("\r", "").replace("\n", "")
+    return text[:max_length]
+
+
+_LEGACY_SINGLE_TARGET_ATTRS = (
+    "proxmox_manager", "proxmox", "job_store", "node_tools", "vm_tools",
+    "storage_tools", "cluster_tools", "container_tools", "snapshot_tools",
+    "iso_tools", "backup_tools", "jobs_tools", "log_tools",
+)
+
+
+def _exit_without_finalization(status: int = 0) -> NoReturn:
+    """Terminate the process without running interpreter finalization.
+
+    Raising ``SystemExit`` from a signal handler is unsafe under the stdio
+    transport. The MCP SDK reads stdin from an AnyIO worker thread, using its
+    own ``TextIOWrapper`` built on ``sys.stdin.buffer``
+    (``mcp.server.stdio.stdio_server``). A signal arriving mid-read leaves that
+    thread blocked inside ``readline()``, owning the lock of the
+    ``BufferedReader`` it shares with ``sys.stdin``.
+
+    ``SystemExit`` would then start interpreter finalization, which clears the
+    ``sys`` module dict, deallocates ``sys.stdin`` and tries to close that same
+    ``BufferedReader``. The lock is never released, so CPython gives up after
+    its one-second grace period and calls ``Py_FatalError``::
+
+        Fatal Python error: _enter_buffered_busy: could not acquire lock for
+        <_io.BufferedReader name='<stdin>'> at interpreter shutdown, possibly
+        due to daemon threads
+
+    which aborts the process with ``SIGABRT``. ``os._exit()`` skips
+    finalization entirely, so the shutdown is clean. Callers are responsible
+    for releasing anything that matters before calling this.
+
+    Standard streams are intentionally not flushed here. The SDK also writes
+    stdout through an AnyIO worker thread and a second ``TextIOWrapper``. If
+    that worker is blocked on a full pipe while holding the shared buffered
+    writer lock, flushing from the signal handler would deadlock before
+    ``os._exit()`` can run. The signal handler calls ``close()`` first to
+    release application-owned resources.
+    """
+    os._exit(status)
+
+
+class ProxmoxMCPServer:
+    """Main server class for Proxmox MCP."""
+
+    def __init__(self, config_path: Optional[str] = None):
+        self.code_mode: CodeMode | None = None
+        self.config = load_config(config_path)
+        self.tool_exposure_policy = ToolExposurePolicy(
+            known_tools=BUILTIN_TOOL_NAMES,
+            allowlist=self.config.mcp.tool_allowlist,
+            denylist=self.config.mcp.tool_denylist,
+        )
+        self.logger = setup_logging(self.config.logging)
+        self.target_registry = TargetRegistry(self.config)
+        self.proxmox_managers = {
+            name: ProxmoxManager(
+                target.config,
+                target.auth,
+                api_tunnel_config=target.api_tunnel,
+                ssh_config=target.ssh,
+            )
+            for name in self.target_registry.names
+            for target in [self.target_registry.resolve(name)]
+        }
+        self.target_command_policies = {
+            name: CommandPolicyGate(
+                self.target_registry.resolve(name).command_policy or self.config.command_policy
+            )
+            for name in self.target_registry.names
+        }
+        # Retain the legacy policy attribute for compatibility; wrappers always
+        # select from target_command_policies using the resolved target.
+        self.command_policy = CommandPolicyGate(self.config.command_policy)
+        self.metrics = ToolMetrics()
+
+        self.target_job_stores: dict[str, JobStore] = {}
+        self.target_toolsets: dict[str, SimpleNamespace] = {}
+        for name, manager in self.proxmox_managers.items():
+            target = self.target_registry.resolve(name)
+            api = manager.get_api()
+            base_path = self.config.jobs.sqlite_path
+            is_single_default = self.target_registry.is_legacy
+            if is_single_default:
+                path = base_path
+            else:
+                path = target_job_sqlite_path(base_path, name)
+            job_store = JobStore(api, sqlite_path=path, target_name=name, legacy_mode=is_single_default, audit_retention_days=self.config.jobs.audit_retention_days)
+            self.target_job_stores[name] = job_store
+            self.target_toolsets[name] = SimpleNamespace(
+                node_tools=NodeTools(api, metrics=self.metrics, job_store=job_store),
+                storage_tools=StorageTools(api, metrics=self.metrics, job_store=job_store),
+                cluster_tools=ClusterTools(api, metrics=self.metrics, job_store=job_store),
+                vm_tools=VMTools(
+                    api,
+                    command_policy=self.target_command_policies[name],
+                    metrics=self.metrics,
+                    job_store=job_store,
+                ),
+                container_tools=ContainerTools(
+                    api,
+                    target.ssh if not self.target_registry.is_legacy else self.config.ssh,
+                    command_policy=self.target_command_policies[name],
+                    metrics=self.metrics,
+                    job_store=job_store,
+                    target_name=name,
+                ),
+                snapshot_tools=SnapshotTools(api, metrics=self.metrics, job_store=job_store),
+                iso_tools=ISOTools(api, metrics=self.metrics, job_store=job_store),
+                backup_tools=BackupTools(api, metrics=self.metrics, job_store=job_store),
+                jobs_tools=JobsTools(job_store),
+                log_tools=LogTools(api, metrics=self.metrics, job_store=job_store),
+            )
+
+        if self.target_registry.is_legacy:
+            self.proxmox_manager = next(iter(self.proxmox_managers.values()))
+            self.proxmox = self.proxmox_manager.get_api()
+            self.command_policy = self.target_command_policies["default"]
+            default_store = self.target_job_stores["default"]
+            self.job_store = default_store
+            ts = self.target_toolsets["default"]
+            self.node_tools = ts.node_tools
+            self.vm_tools = ts.vm_tools
+            self.storage_tools = ts.storage_tools
+            self.cluster_tools = ts.cluster_tools
+            self.container_tools = ts.container_tools
+            self.snapshot_tools = ts.snapshot_tools
+            self.iso_tools = ts.iso_tools
+            self.backup_tools = ts.backup_tools
+            self.jobs_tools = ts.jobs_tools
+            self.log_tools = ts.log_tools
+
+        log_level = cast(
+            Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+            self.config.logging.level.upper(),
+        )
+        transport_security = self._build_transport_security()
+        if self.config.mcp.transport == "STREAMABLE":
+            self.oauth_provider, oauth_auth = build_oauth_from_env()
+        else:
+            self.oauth_provider, oauth_auth = None, None
+            oauth_raw = os.getenv("MCP_OAUTH_ENABLED", "false").strip().lower()
+            if self.config.mcp.transport == "SSE" and oauth_raw in {"1", "true", "yes", "on"}:
+                raise ValueError("MCP OAuth mode supports STREAMABLE HTTP only")
+        if transport_security is None:
+            self.mcp = FastMCP(
+                "ProxmoxMCP",
+                host=self.config.mcp.host,
+                port=self.config.mcp.port,
+                log_level=log_level,
+                auth_server_provider=self.oauth_provider,
+                auth=oauth_auth,
+                lifespan=self._lifespan,
+            )
+        else:
+            self.mcp = FastMCP(
+                "ProxmoxMCP",
+                host=self.config.mcp.host,
+                port=self.config.mcp.port,
+                log_level=log_level,
+                transport_security=transport_security,
+                auth_server_provider=self.oauth_provider,
+                auth=oauth_auth,
+                lifespan=self._lifespan,
+            )
+        if self.oauth_provider is not None:
+            self.oauth_provider.register_routes(self.mcp)
+        self.tool_registry = ToolRegistry(self.mcp, self.tool_exposure_policy)
+        self._setup_tools()
+        if self.config.mcp.code_mode:
+            self.code_mode = install_code_mode(self)
+
+    @asynccontextmanager
+    async def _lifespan(self, _mcp: Any) -> AsyncIterator[dict[str, Any]]:
+        # HTTP SDK lifespans run per client session. Own its pool around the
+        # HTTP server instead, so disconnecting one client cannot close others.
+        if self.config.mcp.transport == "STDIO":
+            async with self._code_mode_lifespan():
+                yield {}
+        else:
+            yield {}
+
+    @asynccontextmanager
+    async def _code_mode_lifespan(self) -> AsyncIterator[None]:
+        if self.code_mode is not None and self.config.mcp.code_mode_pool_reuse:
+            async with self.code_mode.pool_lifespan():
+                yield
+        else:
+            yield
+
+    def _build_transport_security(self) -> Any | None:
+        mcp_config = self.config.mcp
+        configured = (
+            mcp_config.dns_rebinding_protection is not None
+            or bool(mcp_config.allowed_hosts)
+            or bool(mcp_config.allowed_origins)
+        )
+        if not configured:
+            return None
+        if TransportSecuritySettings is None:
+            raise RuntimeError(
+                "MCP transport security settings require mcp>=1.24.0. "
+                "Upgrade the mcp package or remove mcp.dns_rebinding_protection, "
+                "mcp.allowed_hosts, and mcp.allowed_origins from the config."
+            )
+
+        enable_protection = mcp_config.dns_rebinding_protection
+        if enable_protection is None:
+            enable_protection = True
+
+        return TransportSecuritySettings(
+            enable_dns_rebinding_protection=enable_protection,
+            allowed_hosts=mcp_config.allowed_hosts,
+            allowed_origins=mcp_config.allowed_origins,
+        )
+
+    def _setup_tools(self) -> None:
+        self.tool_registry.add(CoreToolsPlugin())
+        self.tool_registry.add(JobsToolsPlugin())
+        self.tool_registry.add(VMToolsPlugin())
+        self.tool_registry.add(ContainerToolsPlugin())
+        self.tool_registry.add(SnapshotToolsPlugin())
+        self.tool_registry.add(ImageToolsPlugin())
+        self.tool_registry.add(BackupToolsPlugin())
+        self.tool_registry.add(LogToolsPlugin())
+        self.tool_registry.register_all(self)
+
+        unavailable = self.tool_registry.requested_but_unavailable
+        if unavailable:
+            self.logger.warning(
+                "Allowlisted MCP tools unavailable under the current capability config: %s",
+                ", ".join(sorted(unavailable)),
+            )
+        self.logger.info(
+            "MCP tool exposure mode=%s, registered=%d, available=%d, catalog=%d",
+            self.tool_exposure_policy.mode,
+            len(self.tool_registry.registered_tools),
+            len(self.tool_registry.declared_tools),
+            len(BUILTIN_TOOL_NAMES),
+        )
+        self.logger.debug(
+            "Registered MCP tools: %s",
+            ", ".join(sorted(self.tool_registry.registered_tools)),
+        )
+
+    def target_tools(self, requested: str | None) -> SimpleNamespace:
+        name = self.target_registry.resolve(requested).name
+        return self.target_toolsets[name]
+
+    def close(self) -> None:
+        if hasattr(self, "job_store"):
+            try:
+                self.job_store.close()
+            except Exception as exc:
+                self.logger.warning("Failed to close default job store: %s", _log_safe(exc))
+        for job_store in self.target_job_stores.values():
+            if hasattr(self, "job_store") and job_store is getattr(self, "job_store", None):
+                continue
+            try:
+                job_store.close()
+            except Exception as exc:
+                self.logger.warning("Failed to close job store: %s", _log_safe(exc))
+        for manager in self.proxmox_managers.values():
+            try:
+                manager.close()
+            except Exception:
+                self.logger.warning("Failed to close Proxmox manager cleanly")
+
+    def __getattr__(self, name: str) -> Any:
+        if name in _LEGACY_SINGLE_TARGET_ATTRS:
+            raise AttributeError(
+                f"'{name}' is only available in single-target (legacy) mode; use target_registry/target_tools in multi-target mode"
+            )
+        raise AttributeError(name)
+
+    async def _run_streamable_http_async(self, *, sse: bool = False) -> None:
+        """Run Streamable HTTP with SDK OAuth or legacy Bearer authentication."""
+        import uvicorn
+
+        if self.oauth_provider is not None and sse:
+            raise ValueError("MCP OAuth mode supports STREAMABLE HTTP only")
+
+        app: Any = self.mcp.sse_app() if sse else self.mcp.streamable_http_app()
+        if self.oauth_provider is not None:
+            app = self.oauth_provider.bind_http_lifespan(app)
+        api_key = os.getenv("MCP_API_KEY")
+        if self.oauth_provider is not None:
+            self.logger.info(
+                "MCP HTTP OAuth is enabled for issuer %s",
+                self.oauth_provider.issuer_url,
+            )
+        elif api_key:
+            app = MCPBearerAuthMiddleware(app, api_key=api_key)
+            self.logger.info("MCP HTTP bearer authentication is enabled")
+        elif not self.config.mcp.allow_unauthenticated_http:
+            raise ValueError(
+                "MCP_API_KEY must be set for native MCP HTTP transport. "
+                "For deployments protected by external access control only, explicitly set "
+                "MCP_ALLOW_UNAUTHENTICATED_HTTP=true (mcp.allow_unauthenticated_http)."
+            )
+        else:
+            self.logger.warning(
+                "MCP HTTP is running without MCP_API_KEY by explicit opt-out; "
+                "any client that can reach the endpoint may invoke MCP tools"
+            )
+
+        config = uvicorn.Config(
+            app,
+            host=self.mcp.settings.host,
+            port=self.mcp.settings.port,
+            log_level=self.mcp.settings.log_level.lower(),
+        )
+        async with self._code_mode_lifespan():
+            await uvicorn.Server(config).serve()
+
+    async def _run_sse_http_async(self) -> None:
+        await self._run_streamable_http_async(sse=True)
+
+    def start(self) -> None:
+        """Start the MCP server with the configured transport."""
+        import anyio
+
+        transport = self.config.mcp.transport
+        # Mirrors the dispatch below: anything that is not SSE or STREAMABLE
+        # is served over stdio.
+        uses_stdio = transport not in ("SSE", "STREAMABLE")
+
+        def signal_handler(signum: int, frame: object) -> None:
+            self.logger.info("Received signal to shutdown...")
+            if uses_stdio:
+                try:
+                    self.close()
+                finally:
+                    _exit_without_finalization()
+            else:
+                self.close()
+                sys.exit(0)
+
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+
+        try:
+            self.logger.info("Starting Proxmox MCP Server with transport: %s", transport)
+
+            if transport == "STDIO":
+                anyio.run(self.mcp.run_stdio_async)
+            elif transport == "SSE":
+                anyio.run(self._run_sse_http_async)
+            elif transport == "STREAMABLE":
+                anyio.run(self._run_streamable_http_async)
+            else:
+                anyio.run(self.mcp.run_stdio_async)
+        except Exception as e:
+            self.logger.error("Server execution failed: %s", _log_safe(e))
+            sys.exit(1)
+        finally:
+            self.close()
+
+
+def main() -> None:
+    """CLI entrypoint for running the Proxmox MCP server."""
+    config_path = os.getenv("PROXMOX_MCP_CONFIG")
+
+    try:
+        server = ProxmoxMCPServer(config_path)
+        server.start()
+    except KeyboardInterrupt:
+        print("\nShutting down gracefully...", file=sys.stderr)
+        sys.exit(0)
+    except Exception as e:
+        import traceback
+
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
+        print(f"Server initialization failed: {e}", file=sys.stderr)
+        sys.stderr.flush()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

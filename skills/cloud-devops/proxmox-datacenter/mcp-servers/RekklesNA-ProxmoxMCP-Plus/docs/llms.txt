@@ -1,0 +1,24 @@
+# ProxmoxMCP-Plus Documentation For LLMs
+
+Use these pages as the primary documentation context for ProxmoxMCP-Plus.
+
+- Project overview: ../README.md
+- Client setup: wiki/Client Setup.md
+- Operator guide: wiki/Operator Guide.md
+- Tool selection guide: wiki/Tool Selection Guide.md
+- Security guide: wiki/Security Guide.md
+- Container command execution: wiki/Container Command Execution.md
+- API and tool reference: wiki/API & Tool Reference.md
+- Troubleshooting: wiki/Troubleshooting.md
+- Developer guide: wiki/Developer Guide.md
+- Release and upgrade notes: wiki/Release & Upgrade Notes.md
+- Documentation quality plan: wiki/Documentation Quality Plan.md
+
+Important operating notes:
+
+- Use read-only tools such as `get_nodes`, `get_vms`, `get_containers`, and `get_storage` before mutating Proxmox resources.
+- Use `job_id` for ProxmoxMCP-Plus job tracking and `task_id` for raw Proxmox `UPID` traceability.
+- MCP Streamable HTTP clients should connect to `/mcp` on port `8000` and send `Authorization: Bearer <MCP_API_KEY>` when native authentication is configured.
+- OpenAPI clients should use the service on port `8811` and send `Authorization: Bearer <PROXMOX_API_KEY>`.
+- Container command execution appears only when the config includes an `ssh` section.
+- TLS verification should remain enabled outside explicit local development mode.

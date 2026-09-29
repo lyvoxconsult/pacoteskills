@@ -1,0 +1,622 @@
+"""
+Tool descriptions for Proxmox MCP tools.
+"""
+
+LIST_JOBS_DESC = """List tracked long-running jobs created by MCP tools.
+
+Parameters:
+status - Filter by job status (optional)
+tool_name - Filter by originating tool (optional)
+limit - Maximum rows to return (default: 100)
+"""
+
+GET_JOB_DESC = """Get the current state of a tracked job by job_id.
+
+Parameters:
+job_id* - Stable job identifier returned by long-running tools
+refresh - Poll Proxmox before returning the job state (default: false)
+"""
+
+POLL_JOB_DESC = """Poll the backing Proxmox task for a tracked job and refresh status/progress."""
+
+CANCEL_JOB_DESC = """Best-effort cancel for a tracked long-running job.
+
+This uses the stored Proxmox task UPID when cancellation is supported.
+"""
+
+RETRY_JOB_DESC = """Retry a tracked long-running job using its stored retry recipe.
+
+The same job_id is preserved and its attempt counter is incremented.
+"""
+
+# Node tool descriptions
+GET_NODES_DESC = """List all nodes in the Proxmox cluster with their status, CPU, memory, and role information.
+
+Example:
+{"node": "pve1", "status": "online", "cpu_usage": 0.15, "memory": {"used": "8GB", "total": "32GB"}}"""
+
+GET_NODE_STATUS_DESC = """Get detailed status information for a specific Proxmox node.
+
+Parameters:
+node* - Name/ID of node to query (e.g. 'pve1')
+
+Example:
+{"cpu": {"usage": 0.15}, "memory": {"used": "8GB", "total": "32GB"}}"""
+
+# VM tool descriptions
+GET_VMS_DESC = """List all virtual machines across the cluster with their status and resource usage.
+
+Example:
+{"vmid": "100", "name": "ubuntu", "status": "running", "cpu": 2, "memory": 4096}"""
+
+GET_VM_CONFIG_DESC = """Get the full configuration of a QEMU virtual machine.
+
+Returns hardware configuration including CPU, memory, disk, network, BIOS type, boot order, and more.
+This is equivalent to get_container_config but for QEMU VMs.
+
+Parameters:
+node* - Host node name (e.g. 'pve')
+vmid* - VM ID number (e.g. '100')
+
+Example:
+{"vmid": "100", "name": "ubuntu", "cores": 2, "memory": 4096, "scsi0": "local-lvm:vm-100-disk-0,size=20G"}"""
+
+SET_VM_DESCRIPTION_DESC = """Set/replace the description (Notes field in the UI) of a QEMU VM.
+
+Uses PUT /nodes/{node}/qemu/{vmid}/config. Pass an empty string to clear the notes.
+
+Parameters:
+node*        - Host node name (e.g. 'pve')
+vmid*        - VM ID number (e.g. '100')
+description* - New notes text (replaces any existing notes)
+
+Example:
+set_vm_description node='pve' vmid='100' description='Decommissioned - see #123'
+"""
+
+GET_NEXT_VMID_DESC = """Get the next free VM/container ID in the cluster.
+
+Uses GET /cluster/nextid. Call it right before clone_vm or create_vm so the
+target ID is one Proxmox itself considers unused.
+
+Example:
+{"vmid": "105"}"""
+
+UPDATE_VM_CONFIG_DESC = """Update sizing, cloud-init, ISO media, boot order and net0 bridge of an existing QEMU VM.
+iso_volume accepts a storage volume ID or none to eject. cdrom_device defaults to ide3;
+existing disks and cloud-init drives cannot be overwritten. boot_order uses semicolon-separated
+device names. network_bridge preserves the other net0 options.
+
+Uses PUT /nodes/{node}/qemu/{vmid}/config with only the supplied fields. This is
+the step between clone_vm and start_vm that makes a fresh clone reachable:
+inject SSH keys, set the cloud-init user, pick a static IP, resize memory.
+
+Parameters:
+node*        - Host node name (e.g. 'pve')
+vmid*        - VM ID number (e.g. '105')
+memory       - RAM in MiB (e.g. 4096)
+cores        - CPU cores per socket
+sockets      - CPU sockets
+name         - New VM name (DNS label)
+sshkeys      - OpenSSH public keys, one per line (cloud-init; percent-encoded for you)
+ciuser       - cloud-init user name (e.g. 'ubuntu')
+ipconfig0    - cloud-init IP for net0, e.g. 'ip=dhcp' or 'ip=10.0.0.5/24,gw=10.0.0.1'
+nameserver   - cloud-init DNS server(s)
+searchdomain - cloud-init DNS search domain
+tags         - Proxmox tags, semicolon-separated
+approval_token - Approval token when required by the target's high-risk policy
+
+This tool is classified as high risk, including SSH key changes, and follows
+the selected target's command_policy.high_risk_* settings.
+
+Cloud-init fields take effect at the guest's next boot; sizing changes on a
+running VM stay pending until it restarts.
+
+Example:
+update_vm_config node='pve' vmid='105' memory=4096 ciuser='hola' sshkeys='ssh-ed25519 AAAA... ci@host'"""
+
+GET_VM_IP_ADDRESSES_DESC = """Get a running VM's network interfaces and IP addresses via the QEMU guest agent.
+
+Uses GET /nodes/{node}/qemu/{vmid}/agent/network-get-interfaces. The VM must be
+running with qemu-guest-agent active. Loopback is skipped; primary_ip is the
+first non-loopback IPv4 address.
+
+Parameters:
+node* - Host node name (e.g. 'pve')
+vmid* - VM ID number (e.g. '105')
+
+Example:
+{"vmid": "105", "primary_ip": "10.0.0.57", "interfaces": [{"name": "eth0", "mac": "bc:24:11:..", "ipv4": ["10.0.0.57"], "ipv6": ["fe80::..."]}]}"""
+
+CREATE_VM_DESC = """Create a new virtual machine with specified configuration.
+Optionally mount an existing iso_volume (e.g. local:iso/debian.iso) at cdrom_device
+(default ide3). With an ISO, the default boot order is CD-ROM then disk; boot_order
+can specify semicolon-separated device names.
+
+Parameters:
+node* - Host node name (e.g. 'pve')
+vmid* - New VM ID number (e.g. '200', '300')
+name* - VM name (e.g. 'my-new-vm', 'web-server')
+cpus* - Number of CPU cores (e.g. 1, 2, 4)
+memory* - Memory size in MB (e.g. 2048 for 2GB, 4096 for 4GB)
+disk_size* - Disk size in GB (e.g. 10, 20, 50)
+storage - Storage name (optional, will auto-detect if not specified)
+ostype - OS type (optional, default: 'l26' for Linux)
+network_bridge - Network bridge name (optional, default: 'vmbr0')
+pool - Target Proxmox resource pool (optional)
+
+Examples:
+- Create VM with 1 CPU, 2GB RAM, 10GB disk: node='pve', vmid='200', name='test-vm', cpus=1, memory=2048, disk_size=10
+- Create VM with 2 CPUs, 4GB RAM, 20GB disk: node='pve', vmid='201', name='web-server', cpus=2, memory=4096, disk_size=20"""
+
+CLONE_VM_DESC = """Clone an existing virtual machine.
+
+Parameters:
+node* - Source host node name that currently owns the VM (e.g. 'pve')
+source_vmid* - Existing source VM ID (e.g. '9000')
+target_vmid* - New VM ID for the clone (e.g. '201')
+name - New VM name (optional)
+target_node - Destination node for the clone (optional, defaults to source node)
+full - Full clone (true, default) or linked clone (false)
+storage - Target storage (optional)
+pool - Target resource pool (optional)
+snapname - Snapshot name to clone from (optional)
+
+Example:
+clone_vm node='pve' source_vmid='9000' target_vmid='201' name='web-201' full=true"""
+
+EXECUTE_VM_COMMAND_DESC = """Execute commands in a VM via QEMU guest agent.
+
+Parameters:
+node* - Host node name (e.g. 'pve1')
+vmid* - VM ID number (e.g. '100')
+command* - Shell command to run (e.g. 'uname -a')
+
+Example:
+{"success": true, "output": "Linux vm1 5.4.0", "exit_code": 0}"""
+
+# VM Power Management tool descriptions
+START_VM_DESC = """Start a virtual machine.
+
+Parameters:
+node* - Host node name (e.g. 'pve')
+vmid* - VM ID number (e.g. '101')
+
+Example:
+Power on VPN-Server with ID 101 on node pve"""
+
+STOP_VM_DESC = """Stop a virtual machine (force stop).
+
+Parameters:
+node* - Host node name (e.g. 'pve')
+vmid* - VM ID number (e.g. '101')
+
+Example:
+Force stop VPN-Server with ID 101 on node pve"""
+
+SHUTDOWN_VM_DESC = """Shutdown a virtual machine gracefully.
+
+Parameters:
+node* - Host node name (e.g. 'pve')
+vmid* - VM ID number (e.g. '101')
+
+Example:
+Gracefully shutdown VPN-Server with ID 101 on node pve"""
+
+RESET_VM_DESC = """Reset (restart) a virtual machine.
+
+Parameters:
+node* - Host node name (e.g. 'pve')
+vmid* - VM ID number (e.g. '101')
+
+Example:
+Reset VPN-Server with ID 101 on node pve"""
+
+DELETE_VM_DESC = """Delete/remove a virtual machine completely.
+
+ WARNING: This operation permanently deletes the VM and all its data!
+
+Parameters:
+node* - Host node name (e.g. 'pve')
+vmid* - VM ID number (e.g. '998')
+force - Force deletion even if VM is running (optional, default: false)
+
+This will permanently remove:
+- VM configuration
+- All virtual disks
+- All snapshots
+- Cannot be undone!
+
+Example:
+Delete test VM with ID 998 on node pve"""
+
+# Container tool descriptions
+GET_CONTAINERS_DESC = """List LXC containers across the cluster (or filter by node).
+
+Parameters:
+- node (optional): Node name to filter (e.g. 'pve1')
+- include_stats (bool, default false): Fetch per-container live CPU/memory stats
+- include_raw (bool, default false): Include raw Proxmox API payloads for debugging
+- format_style ('pretty'|'json', default 'pretty'): Pretty text or raw JSON list
+
+Notes:
+- Live stats from /nodes/{node}/lxc/{vmid}/status/current.
+- If maxmem is 0 (unlimited), memory limit falls back to /config.memory (MiB).
+- If live returns zeros, the most recent RRD sample is used as a fallback.
+- Fields provided: cores (CPU cores/cpulimit), memory (MiB limit), cpu_pct, mem_bytes, maxmem_bytes, mem_pct, unlimited_memory.
+"""
+
+START_CONTAINER_DESC = """Start one or more LXC containers.
+selector: '123' | 'pve1:123' | 'pve1/name' | 'name' | comma list
+Example: start_container selector='pve1:101,pve2/web'
+"""
+
+STOP_CONTAINER_DESC = """Stop LXC containers. graceful=True uses shutdown; otherwise force stop.
+selector: same grammar as start_container
+timeout_seconds: 10 (default)
+"""
+
+RESTART_CONTAINER_DESC = """Restart LXC containers (reboot).
+selector: same grammar as start_container
+"""
+
+UPDATE_CONTAINER_RESOURCES_DESC = """Update resources for one or more LXC containers.
+
+selector: same grammar as start_container
+cores: New CPU core count (optional)
+memory: New memory limit in MiB (optional)
+swap: New swap limit in MiB (optional)
+disk_gb: Additional disk size in GiB to add (optional)
+disk: Disk identifier to resize (default 'rootfs')
+"""
+
+CREATE_CONTAINER_DESC = """Create a new LXC container from an OS template (not an ISO).
+Choose network_bridge and optional ip (IPv4/CIDR, dhcp or manual), gw,
+ip6 (IPv6/CIDR, auto, dhcp or manual) and gw6. IPv4 defaults to DHCP.
+Use update_container_network to edit network settings after creation.
+
+Parameters:
+node* - Host node name (e.g. 'pve', 'pveZ3')
+vmid* - Container ID number (e.g. '200', '300')
+ostemplate* - OS template path (e.g. 'local:vztmpl/alpine-3.19-default_20240207_amd64.tar.xz')
+hostname - Container hostname (optional, defaults to 'ct-{vmid}')
+cores - Number of CPU cores (optional, default: 1)
+memory - Memory size in MiB (optional, default: 512)
+swap - Swap size in MiB (optional, default: 512)
+disk_size - Root disk size in GB (optional, default: 8)
+storage - Storage pool for rootfs (optional, auto-detects if not specified)
+password - Root password (optional)
+ssh_public_keys - SSH public keys for root user (optional)
+network_bridge - Network bridge name (optional, default: 'vmbr0')
+start_after_create - Start container after creation (optional, default: false)
+onboot - Start container automatically on host boot (optional, default: false)
+nesting - Enable LXC nesting (optional, sets features='nesting=1', default: false)
+unprivileged - Create unprivileged container (optional, default: true)
+pool - Target Proxmox resource pool (optional)
+
+Examples:
+- Create Alpine container: node='pveZ3', vmid='200', ostemplate='local:vztmpl/alpine-3.19-default_20240207_amd64.tar.xz'
+- Create with custom resources: node='pve', vmid='201', ostemplate='local:vztmpl/ubuntu-22.04-standard_22.04-1_amd64.tar.zst', cores=2, memory=2048, disk_size=20
+"""
+
+DELETE_CONTAINER_DESC = """Delete/remove an LXC container completely.
+
+WARNING: This operation permanently deletes the container and all its data!
+
+Parameters:
+selector* - Container selector: '123' | 'pve1:123' | 'pve1/name' | 'name' | comma list
+force - Force deletion even if container is running (optional, default: false)
+
+This will permanently remove:
+- Container configuration
+- Root filesystem and all data
+- All snapshots
+- Cannot be undone!
+
+Examples:
+- Delete container 200: selector='200'
+- Delete by name: selector='my-container'
+- Force delete running container: selector='pve:201', force=True
+"""
+
+EXECUTE_CONTAINER_COMMAND_DESC = """Execute a shell command inside a running LXC container.
+
+No guest agent required - connects to the Proxmox node via SSH and uses `pct exec`.
+Commands have a 60-second wall-clock limit (TERM, then KILL after 5 seconds).
+Timeout returns success=false, code=COMMAND_TIMEOUT with partial output.
+Partial changes are not rolled back; inspect state before retrying.
+
+Parameters:
+selector* - Container selector: '123' | 'pve1:123' | 'pve1/name' | 'name'
+command*  - Shell command to run (e.g. 'uname -a', 'df -h')
+
+Example:
+{"success": true, "output": "Linux ct-101 6.1.0", "exit_code": 0}
+
+Requirements:
+- Container must be running
+- Container must provide GNU coreutils /usr/bin/timeout
+- MCP config must include valid [ssh] credentials for the Proxmox nodes
+"""
+
+# Storage tool descriptions
+GET_STORAGE_DESC = """List storage pools across the cluster with their usage and configuration.
+
+Example:
+{"storage": "local-lvm", "type": "lvm", "used": "500GB", "total": "1TB"}"""
+
+# Cluster tool descriptions
+GET_CLUSTER_STATUS_DESC = """Get overall Proxmox cluster health and configuration status.
+
+Example:
+{"name": "proxmox", "quorum": "ok", "nodes": 3, "ha_status": "active"}"""
+
+# Snapshot tool descriptions
+LIST_SNAPSHOTS_DESC = """List all snapshots for a VM or container.
+
+Parameters:
+node* - Host node name (e.g. 'pve')
+vmid* - VM or container ID (e.g. '100')
+vm_type - Type: 'qemu' for VMs, 'lxc' for containers (default: 'qemu')
+
+Example:
+list_snapshots node='pve' vmid='100' vm_type='qemu'
+"""
+
+CREATE_SNAPSHOT_DESC = """Create a snapshot of a VM or container.
+
+Parameters:
+node* - Host node name
+vmid* - VM or container ID
+snapname* - Snapshot name (no spaces, e.g. 'before-update')
+description - Optional description
+vmstate - Include memory state (VMs only, default: false)
+vm_type - Type: 'qemu' or 'lxc' (default: 'qemu')
+
+Examples:
+- Create VM snapshot: node='pve', vmid='100', snapname='pre-upgrade'
+- Create with RAM state: node='pve', vmid='100', snapname='state1', vmstate=true
+"""
+
+DELETE_SNAPSHOT_DESC = """Delete a snapshot.
+
+Parameters:
+node* - Host node name
+vmid* - VM or container ID
+snapname* - Snapshot name to delete
+vm_type - Type: 'qemu' or 'lxc' (default: 'qemu')
+
+Example:
+delete_snapshot node='pve' vmid='100' snapname='old-snapshot'
+"""
+
+ROLLBACK_SNAPSHOT_DESC = """Rollback VM/container to a previous snapshot.
+
+WARNING: This will stop the VM/container and restore to the snapshot state!
+
+Parameters:
+node* - Host node name
+vmid* - VM or container ID
+snapname* - Snapshot name to restore
+vm_type - Type: 'qemu' or 'lxc' (default: 'qemu')
+
+Example:
+rollback_snapshot node='pve' vmid='100' snapname='before-update'
+"""
+
+# ISO and Template tool descriptions
+LIST_ISOS_DESC = """List available ISO images across the cluster.
+
+Parameters:
+node - Filter by node (optional)
+storage - Filter by storage pool (optional)
+
+Returns list of ISOs with filename, size, and storage location.
+"""
+
+LIST_TEMPLATES_DESC = """List available OS templates for container creation.
+
+Parameters:
+node - Filter by node (optional)
+storage - Filter by storage pool (optional)
+
+Returns list of templates (vztmpl) with name, size, and storage.
+Use the returned Volume ID with create_container's ostemplate parameter.
+"""
+
+DOWNLOAD_ISO_DESC = """Download an ISO image from a URL to Proxmox storage.
+
+Parameters:
+node* - Target node name
+storage* - Target storage pool (must support ISO content)
+url* - URL to download from
+filename* - Target filename (e.g. 'ubuntu-22.04-live-server-amd64.iso')
+checksum - Optional checksum for verification
+checksum_algorithm - Algorithm: sha256, sha512, md5 (default: sha256)
+
+Example:
+download_iso node='pve' storage='local' url='https://...' filename='ubuntu.iso'
+"""
+
+DELETE_ISO_DESC = """Delete an ISO or template from storage.
+
+Parameters:
+node* - Node name
+storage* - Storage pool name
+filename* - ISO/template filename to delete
+
+Example:
+delete_iso node='pve' storage='local' filename='old-distro.iso'
+"""
+
+# Backup and Restore tool descriptions
+LIST_BACKUPS_DESC = """List available backups across the cluster.
+
+Parameters:
+node - Filter by node (optional)
+storage - Filter by storage pool (optional)
+vmid - Filter by VM/container ID (optional)
+
+Returns backups with timestamp, size, compression, and notes.
+Use the returned Volume ID with restore_backup.
+"""
+
+CREATE_BACKUP_DESC = """Create a backup of a VM or container.
+
+Parameters:
+node* - Node where VM/container runs
+vmid* - VM or container ID to backup
+storage* - Target backup storage
+compress - Compression: 0, gzip, lz4, zstd (default: zstd)
+mode - Backup mode: snapshot, suspend, stop (default: snapshot)
+notes - Optional notes/description for the backup
+
+Example:
+create_backup node='pve' vmid='100' storage='backup-storage' compress='zstd'
+"""
+
+RESTORE_BACKUP_DESC = """Restore a VM or container from a backup.
+
+Parameters:
+node* - Target node for restore
+archive* - Backup volume ID (from list_backups output)
+vmid* - New VM/container ID for the restored machine
+storage - Target storage for disks (optional, uses original if not specified)
+unique - Generate unique MAC addresses (default: true)
+
+Example:
+restore_backup node='pve' archive='backup:backup/vzdump-qemu-100-2024_01_15.vma.zst' vmid='200'
+"""
+
+DELETE_BACKUP_DESC = """Delete a backup file from storage.
+
+WARNING: This permanently deletes the backup!
+
+Parameters:
+node* - Node name
+storage* - Storage pool name
+volid* - Backup volume ID to delete
+
+Example:
+delete_backup node='pve' storage='backup-storage' volid='backup:backup/vzdump-qemu-100-2024_01_15.vma.zst'
+"""
+
+# LXC config tools (no SSH required)
+GET_CONTAINER_CONFIG_DESC = """Get the full configuration of an LXC container.
+
+Returns network interfaces, mounts, features, CPU/memory limits, startup options and more.
+
+Parameters:
+node* - Proxmox node name (e.g. 'pve')
+vmid* - Container ID (e.g. '101')
+
+Example:
+{"vmid": "101", "hostname": "valkey", "cores": 1, "memory": 1024, "net0": "name=eth0,..."}
+"""
+
+SET_CONTAINER_DESCRIPTION_DESC = """Set/replace the description (Notes field in the UI) of an LXC container.
+
+Uses PUT /nodes/{node}/lxc/{vmid}/config. Pass an empty string to clear the notes.
+
+Parameters:
+node*        - Proxmox node name (e.g. 'pve')
+vmid*        - Container ID (e.g. '101')
+description* - New notes text (replaces any existing notes)
+
+Example:
+set_container_description node='pve' vmid='101' description='GitLab Runner host (ct101-alpine)'
+"""
+
+GET_CONTAINER_IP_DESC = """Get the current IP address(es) of a running LXC container.
+
+Queries /nodes/{node}/lxc/{vmid}/interfaces - works with DHCP (no static IP needed).
+
+Parameters:
+node* - Proxmox node name (e.g. 'pve')
+vmid* - Container ID (e.g. '101')
+
+Returns:
+{"vmid": "101", "name": "valkey", "interfaces": [...], "primary_ip": "10.1.0.101"}
+"""
+
+UPDATE_CONTAINER_SSH_KEYS_DESC = """Inject or replace SSH authorized_keys for root in an LXC container.
+
+Uses pct exec via SSH to the Proxmox host - requires SSH to be configured.
+
+Parameters:
+node*        - Proxmox node name (e.g. 'pve')
+vmid*        - Container ID (e.g. '101')
+public_keys* - Newline-separated public key(s) to authorize
+mode         - 'append' (default) or 'replace'
+
+Returns:
+{"success": true, "keys_added": 1}
+"""
+
+# Log tool descriptions
+GET_NODE_SYSLOG_DESC = """Read syslog entries from a Proxmox node.
+
+Parameters:
+node*   - Node name (e.g. 'pve', 'pve1')
+limit   - Maximum number of log lines to return (default: 100, max: 1000)
+start   - Start line for pagination (0-based, optional)
+since   - Show entries from this date/time onward
+          (format: YYYY-MM-DD or YYYY-MM-DD HH:MM or YYYY-MM-DD HH:MM:SS, optional)
+until   - Show entries up to this date/time (same format as since, optional)
+service - Filter by service name (e.g. 'pvedaemon', 'pveproxy', optional)
+
+Example:
+get_node_syslog node='pve' limit=50 service='pvedaemon'
+"""
+
+GET_TASK_LOG_DESC = """Get the log output of a specific Proxmox task by its UPID.
+
+Parameters:
+node*  - Node name that ran the task (e.g. 'pve')
+upid*  - Unique Process ID of the task (e.g. the Task ID returned by
+         VM/container operations or list_jobs)
+start  - Start line for pagination (0-based, optional)
+limit  - Maximum number of log lines to return (default: 50, max: 500)
+
+Example:
+get_task_log node='pve' upid='UPID:pve:00001234:...' limit=100
+"""
+
+GET_CLUSTER_LOG_DESC = """Read recent cluster-wide log entries.
+
+Parameters:
+max_entries - Maximum number of entries to return (default: 50, max: 1000)
+
+Each entry includes: time, node, user, tag (service), pri (priority), msg.
+
+Example:
+get_cluster_log max_entries=100
+"""
+
+GET_NODE_FIREWALL_LOG_DESC = """Read the host firewall log of a Proxmox node.
+
+Parameters:
+node*  - Node name (e.g. 'pve', 'pve1')
+limit  - Maximum number of log lines to return (default: 100, max: 1000)
+start  - Start line for pagination (0-based, optional)
+since  - Show entries since this UNIX epoch timestamp (optional)
+until  - Show entries until this UNIX epoch timestamp (optional)
+
+Example:
+get_node_firewall_log node='pve' limit=50
+"""
+
+GET_GUEST_FIREWALL_LOG_DESC = """Read the firewall log of a VM (qemu) or container (lxc).
+
+Parameters:
+node*   - Node hosting the guest (e.g. 'pve')
+vmid*   - VM/container ID (e.g. 100)
+vm_type - Guest type: 'qemu' (default) or 'lxc'
+limit   - Maximum number of log lines to return (default: 100, max: 1000)
+start   - Start line for pagination (0-based, optional)
+since   - Show entries since this UNIX epoch timestamp (optional)
+until   - Show entries until this UNIX epoch timestamp (optional)
+
+Example:
+get_guest_firewall_log node='pve' vmid=100 vm_type='qemu' limit=50
+"""

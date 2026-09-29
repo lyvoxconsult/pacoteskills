@@ -1,0 +1,769 @@
+"""MCP server for Proxmox VE management."""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.utilities.types import Image
+
+from mcp_proxmox.client import ProxmoxClient
+from mcp_proxmox.config import ProxmoxConfig
+from mcp_proxmox.tools import (
+    backup,
+    console,
+    discovery,
+    execute,
+    firewall,
+    lifecycle,
+    migration,
+    monitoring,
+    network,
+    provisioning,
+    resize,
+    snapshots,
+    storage,
+    templates,
+)
+
+mcp = FastMCP("mcp-proxmox")  # type: ignore[call-arg]
+
+_client: ProxmoxClient | None = None
+
+
+def _get_client() -> ProxmoxClient:
+    """Get or create the Proxmox client singleton."""
+    global _client
+    if _client is None:
+        config = ProxmoxConfig.from_env()
+        _client = ProxmoxClient(config)
+    return _client
+
+
+def _to_text(data: Any) -> str:
+    """Convert tool output to formatted text for the LLM."""
+    return json.dumps(data, indent=2, default=str)
+
+
+# --- Discovery Tools ---
+
+
+@mcp.tool()
+def list_nodes() -> str:
+    """List all nodes in the Proxmox cluster with status, CPU, memory, and uptime."""
+    return _to_text(discovery.list_nodes(_get_client()))
+
+
+@mcp.tool()
+def get_node_status(node: str) -> str:
+    """Get detailed status for a specific node including CPU model, memory, disk, and versions.
+
+    Args:
+        node: Name of the Proxmox node (e.g. 'pve', 'node1').
+    """
+    return _to_text(discovery.get_node_status(_get_client(), node))
+
+
+@mcp.tool()
+def list_vms(node: str | None = None, status: str | None = None) -> str:
+    """List all QEMU virtual machines across the cluster.
+
+    Args:
+        node: Optional. Filter by node name.
+        status: Optional. Filter by status ('running', 'stopped').
+    """
+    return _to_text(discovery.list_vms(_get_client(), node, status))
+
+
+@mcp.tool()
+def list_containers(node: str | None = None, status: str | None = None) -> str:
+    """List all LXC containers across the cluster.
+
+    Args:
+        node: Optional. Filter by node name.
+        status: Optional. Filter by status ('running', 'stopped').
+    """
+    return _to_text(discovery.list_containers(_get_client(), node, status))
+
+
+@mcp.tool()
+def get_guest_status(vmid: int) -> str:
+    """Get detailed status of a VM or container by VMID. Auto-detects type and node.
+
+    Args:
+        vmid: The numeric ID of the VM or container (e.g. 100, 200).
+    """
+    return _to_text(discovery.get_guest_status(_get_client(), vmid))
+
+
+# --- Lifecycle Tools ---
+
+
+@mcp.tool()
+def start_guest(vmid: int) -> str:
+    """Start a stopped VM or container.
+
+    Args:
+        vmid: The numeric ID of the VM or container to start.
+    """
+    return _to_text(lifecycle.start_guest(_get_client(), vmid))
+
+
+@mcp.tool()
+def stop_guest(vmid: int, confirm: bool = False) -> str:
+    """Force-stop a running VM or container. WARNING: May cause data loss.
+
+    Args:
+        vmid: The numeric ID of the VM or container to stop.
+        confirm: Must be true to execute. First call without confirm shows a warning.
+    """
+    return _to_text(lifecycle.stop_guest(_get_client(), vmid, confirm))
+
+
+@mcp.tool()
+def shutdown_guest(vmid: int) -> str:
+    """Gracefully shut down a VM or container via ACPI signal (VMs) or init (containers).
+
+    Args:
+        vmid: The numeric ID of the VM or container to shut down.
+    """
+    return _to_text(lifecycle.shutdown_guest(_get_client(), vmid))
+
+
+@mcp.tool()
+def reboot_guest(vmid: int, confirm: bool = False) -> str:
+    """Reboot a running VM or container.
+
+    Args:
+        vmid: The numeric ID of the VM or container to reboot.
+        confirm: Must be true to execute. First call without confirm shows a warning.
+    """
+    return _to_text(lifecycle.reboot_guest(_get_client(), vmid, confirm))
+
+
+# --- Snapshot Tools ---
+
+
+@mcp.tool()
+def list_snapshots(vmid: int) -> str:
+    """List all snapshots for a VM or container.
+
+    Args:
+        vmid: The numeric ID of the VM or container.
+    """
+    return _to_text(snapshots.list_snapshots(_get_client(), vmid))
+
+
+@mcp.tool()
+def create_snapshot(vmid: int, name: str, description: str = "") -> str:
+    """Create a new snapshot for a VM or container.
+
+    Args:
+        vmid: The numeric ID of the VM or container.
+        name: Snapshot name (alphanumeric, hyphens, underscores).
+        description: Optional description for the snapshot.
+    """
+    return _to_text(snapshots.create_snapshot(_get_client(), vmid, name, description))
+
+
+@mcp.tool()
+def rollback_snapshot(vmid: int, name: str, confirm: bool = False) -> str:
+    """Rollback a VM or container to a previous snapshot.
+
+    WARNING: All changes since the snapshot will be LOST.
+
+    Args:
+        vmid: The numeric ID of the VM or container.
+        name: Name of the snapshot to rollback to.
+        confirm: Must be true to execute. First call without confirm shows a warning.
+    """
+    return _to_text(snapshots.rollback_snapshot(_get_client(), vmid, name, confirm))
+
+
+@mcp.tool()
+def delete_snapshot(vmid: int, name: str, confirm: bool = False) -> str:
+    """Delete a snapshot from a VM or container.
+
+    Args:
+        vmid: The numeric ID of the VM or container.
+        name: Name of the snapshot to delete.
+        confirm: Must be true to execute. First call without confirm shows a warning.
+    """
+    return _to_text(snapshots.delete_snapshot(_get_client(), vmid, name, confirm))
+
+
+# --- Storage Tools ---
+
+
+@mcp.tool()
+def list_storages(node: str | None = None) -> str:
+    """List storage pools across the cluster with capacity and usage info.
+
+    Args:
+        node: Optional. Filter by node name.
+    """
+    return _to_text(storage.list_storages(_get_client(), node))
+
+
+@mcp.tool()
+def list_storage_content(node: str, storage_name: str, content_type: str | None = None) -> str:
+    """List content of a storage pool (ISOs, templates, backups, disk images).
+
+    Args:
+        node: Name of the Proxmox node.
+        storage_name: Name of the storage pool (e.g. 'local', 'local-lvm').
+        content_type: Optional. Filter by type: 'iso', 'vztmpl', 'backup', 'images', 'rootdir'.
+    """
+    return _to_text(storage.list_storage_content(_get_client(), node, storage_name, content_type))
+
+
+# --- Provisioning Tools ---
+
+
+@mcp.tool()
+def create_vm(
+    node: str,
+    name: str,
+    cores: int = 1,
+    memory: int = 2048,
+    disk_size: str = "32G",
+    storage_pool: str = "local-lvm",
+    iso: str | None = None,
+    os_type: str = "l26",
+    net_bridge: str = "vmbr0",
+    start_after_create: bool = False,
+    vmid: int | None = None,
+) -> str:
+    """Create a new QEMU virtual machine.
+
+    The VM is created stopped by default. Use start_after_create=true to auto-start.
+
+    Args:
+        node: Target node name (e.g. 'pve').
+        name: VM name.
+        cores: Number of CPU cores (default 1).
+        memory: Memory in MB (default 2048).
+        disk_size: Disk size with unit (default '32G'). Examples: '10G', '100G', '1T'.
+        storage_pool: Storage for disk (default 'local-lvm').
+        iso: Optional ISO volume ID for installation (e.g. 'local:iso/ubuntu-24.04.iso').
+        os_type: OS type (default 'l26' for Linux). Options: l26, l24, win11, win10, other.
+        net_bridge: Network bridge (default 'vmbr0').
+        start_after_create: Start VM after creation (default false).
+        vmid: Optional specific VMID. Auto-assigned if not provided.
+    """
+    return _to_text(
+        provisioning.create_vm(
+            _get_client(),
+            node=node,
+            name=name,
+            cores=cores,
+            memory=memory,
+            disk_size=disk_size,
+            storage=storage_pool,
+            iso=iso,
+            os_type=os_type,
+            net_bridge=net_bridge,
+            start_after_create=start_after_create,
+            vmid=vmid,
+        )
+    )
+
+
+@mcp.tool()
+def create_container(
+    node: str,
+    name: str,
+    template: str,
+    cores: int = 1,
+    memory: int = 512,
+    disk_size: int = 8,
+    storage_pool: str = "local-lvm",
+    net_bridge: str = "vmbr0",
+    password: str | None = None,
+    ssh_public_keys: str | None = None,
+    start_after_create: bool = False,
+    vmid: int | None = None,
+) -> str:
+    """Create a new LXC container from a template.
+
+    Args:
+        node: Target node name (e.g. 'pve').
+        name: Container hostname.
+        template: Template volume ID (e.g. 'local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst').
+            Use list_storage_content with content_type='vztmpl' to find available templates.
+        cores: Number of CPU cores (default 1).
+        memory: Memory in MB (default 512).
+        disk_size: Root disk size in GB (default 8).
+        storage_pool: Storage for rootfs (default 'local-lvm').
+        net_bridge: Network bridge (default 'vmbr0').
+        password: Optional root password.
+        ssh_public_keys: Optional SSH public keys for root access.
+        start_after_create: Start container after creation (default false).
+        vmid: Optional specific VMID. Auto-assigned if not provided.
+    """
+    return _to_text(
+        provisioning.create_container(
+            _get_client(),
+            node=node,
+            name=name,
+            template=template,
+            cores=cores,
+            memory=memory,
+            disk_size=disk_size,
+            storage=storage_pool,
+            net_bridge=net_bridge,
+            password=password,
+            ssh_public_keys=ssh_public_keys,
+            start_after_create=start_after_create,
+            vmid=vmid,
+        )
+    )
+
+
+@mcp.tool()
+def clone_guest(
+    vmid: int,
+    new_name: str | None = None,
+    target_node: str | None = None,
+    full_clone: bool = True,
+    target_storage: str | None = None,
+    new_vmid: int | None = None,
+) -> str:
+    """Clone an existing VM or container. Auto-detects type and node.
+
+    Creates a full (independent) clone by default. Set full_clone=false for a linked clone.
+
+    Args:
+        vmid: Source VM/container VMID to clone.
+        new_name: Optional name for the clone.
+        target_node: Optional target node for the clone (for cross-node cloning).
+        full_clone: Full clone (true, default) or linked clone (false).
+        target_storage: Optional target storage for the clone's disks.
+        new_vmid: Optional VMID for the clone. Auto-assigned if not provided.
+    """
+    return _to_text(
+        provisioning.clone_guest(
+            _get_client(),
+            vmid=vmid,
+            new_name=new_name,
+            target_node=target_node,
+            full_clone=full_clone,
+            target_storage=target_storage,
+            new_vmid=new_vmid,
+        )
+    )
+
+
+@mcp.tool()
+def delete_guest(vmid: int, confirm: bool = False) -> str:
+    """Permanently delete a VM or container. IRREVERSIBLE.
+
+    The guest must be stopped before deletion. All disk images will be destroyed.
+
+    Args:
+        vmid: The numeric ID of the VM or container to delete.
+        confirm: Must be true to execute. First call without confirm shows a warning.
+    """
+    return _to_text(provisioning.delete_guest(_get_client(), vmid, confirm))
+
+
+# --- Backup Tools ---
+
+
+@mcp.tool()
+def list_backups(
+    node: str | None = None,
+    storage_name: str | None = None,
+    vmid: int | None = None,
+) -> str:
+    """List backup files across storages.
+
+    Args:
+        node: Optional. Filter by node name.
+        storage_name: Optional. Filter by storage name.
+        vmid: Optional. Filter by VMID to see backups of a specific guest.
+    """
+    return _to_text(backup.list_backups(_get_client(), node, storage_name, vmid))
+
+
+@mcp.tool()
+def create_backup(
+    vmid: int,
+    storage_name: str = "local",
+    mode: str = "snapshot",
+    compress: str = "zstd",
+    notes: str = "",
+) -> str:
+    """Create a backup (vzdump) of a VM or container.
+
+    Args:
+        vmid: The numeric ID of the VM or container to back up.
+        storage_name: Target storage for the backup (default 'local').
+        mode: Backup mode: 'snapshot' (no downtime, default), 'suspend', or 'stop'.
+        compress: Compression: 'zstd' (default), 'lzo', 'gzip', or '0' (none).
+        notes: Optional notes/description for the backup.
+    """
+    return _to_text(backup.create_backup(_get_client(), vmid, storage_name, mode, compress, notes))
+
+
+@mcp.tool()
+def restore_backup(
+    volid: str,
+    node: str,
+    vmid: int | None = None,
+    storage_pool: str = "local-lvm",
+    guest_type: str = "vm",
+    confirm: bool = False,
+) -> str:
+    """Restore a VM or container from a backup file.
+
+    Args:
+        volid: Volume ID of the backup (e.g. 'local:backup/vzdump-qemu-100-2024_03_04.vma.zst').
+            Use list_backups to find available backups.
+        node: Target node for the restored guest.
+        vmid: Optional VMID for the restored guest. Auto-assigned if not provided.
+        storage_pool: Storage for restored disks (default 'local-lvm').
+        guest_type: Type of guest: 'vm' or 'container'.
+        confirm: Must be true to execute. First call without confirm shows a warning.
+    """
+    return _to_text(
+        backup.restore_backup(_get_client(), volid, node, vmid, storage_pool, guest_type, confirm)
+    )
+
+
+# --- Command Execution Tools ---
+
+
+@mcp.tool()
+def exec_command(vmid: int, command: str, timeout: int = 30) -> str:
+    """Execute a command inside a QEMU VM via the guest agent.
+
+    Requires qemu-guest-agent to be installed and running inside the VM.
+    Not supported for LXC containers.
+
+    Args:
+        vmid: The numeric ID of the VM.
+        command: The command to execute (e.g. 'hostname', 'df -h', 'systemctl status nginx').
+        timeout: Max seconds to wait for command completion (default 30, max 300).
+    """
+    return _to_text(execute.exec_command(_get_client(), vmid, command, timeout))
+
+
+# --- Console Interaction Tools (Screenshot & Keyboard Input) ---
+
+
+@mcp.tool()
+def vm_screenshot(vmid: int) -> Image:
+    """Capture a PNG screenshot of a QEMU VM's display.
+
+    The VM must be running. Returns the screenshot as a PNG image. Use this
+    to see the current state of the VM console (login prompt, GUI, boot
+    messages, installer screens, etc.).
+
+    Args:
+        vmid: The numeric ID of the QEMU VM.
+    """
+    return console.vm_screenshot(_get_client(), vmid)
+
+
+@mcp.tool()
+def vm_send_key(vmid: int, key: str, confirm: bool = False) -> str:
+    """Send a key or key combination to a QEMU VM's console.
+
+    The VM must be running. Key names are human-readable and auto-converted
+    to QEMU Monitor key codes. Use vm_screenshot first to see the console state.
+
+    Common keys and combos:
+        - 'enter' — Enter key
+        - 'esc' — Escape key
+        - 'tab' — Tab key
+        - 'space' — Space bar
+        - 'backspace' — Backspace
+        - 'up', 'down', 'left', 'right' — Arrow keys
+        - 'f1'-'f12' — Function keys
+        - 'ctrl-alt-delete' — Ctrl+Alt+Del (reboot)
+        - 'ctrl-c' — Ctrl+C
+        - 'win-r' — Win+R (opens Run dialog on Windows)
+        - 'a'-'z', '0'-'9' — Single character keys
+
+    Args:
+        vmid: The numeric ID of the QEMU VM.
+        key: Key name or hyphen-separated combo (e.g. 'enter', 'ctrl-alt-delete', 'win-r').
+        confirm: Must be true to send the key to the VM console.
+    """
+    return _to_text(console.vm_send_key(_get_client(), vmid, key, confirm=confirm))
+
+
+@mcp.tool()
+def vm_send_text(vmid: int, text: str, delay: float = 0.05, confirm: bool = False) -> str:
+    """Type a text string into a QEMU VM's console, character by character.
+
+    Each character is sent as an individual keypress. Use this to type
+    login credentials, commands, or other text into the VM console.
+    Combine with vm_screenshot to verify the result.
+
+    Supports printable ASCII characters. Newlines ('\n') are sent as Enter.
+    Note: characters requiring Shift (uppercase, symbols like '!', '@') are
+    sent with shift automatically.
+
+    Args:
+        vmid: The numeric ID of the QEMU VM.
+        text: Text string to type into the VM console (e.g. 'administrator\nadmin\n').
+        delay: Delay between keypresses in seconds (default 0.05).
+        confirm: Must be true to type the text into the VM console.
+    """
+    return _to_text(console.vm_send_text(_get_client(), vmid, text, delay, confirm=confirm))
+
+
+# --- Monitoring Tools ---
+
+
+@mcp.tool()
+def get_guest_metrics(vmid: int, timeframe: str = "hour") -> str:
+    """Get resource usage metrics (CPU, memory, network, disk I/O) for a VM or container.
+
+    Args:
+        vmid: The numeric ID of the VM or container.
+        timeframe: Time range for metrics. Options: 'hour', 'day', 'week', 'month', 'year'.
+    """
+    return _to_text(monitoring.get_guest_metrics(_get_client(), vmid, timeframe))
+
+
+@mcp.tool()
+def list_tasks(node: str, limit: int = 20, status: str | None = None) -> str:
+    """List recent tasks on a Proxmox node (backups, migrations, snapshots, etc.).
+
+    Args:
+        node: Name of the Proxmox node.
+        limit: Maximum number of tasks to return (default 20, max 100).
+        status: Optional. Filter by task status ('ok', 'error', 'running').
+    """
+    return _to_text(monitoring.list_tasks(_get_client(), node, limit, status))
+
+
+# --- Network Tools ---
+
+
+@mcp.tool()
+def list_networks(node: str) -> str:
+    """List network interfaces, bridges, and bonds on a Proxmox node.
+
+    Args:
+        node: Name of the Proxmox node (e.g. 'pve').
+    """
+    return _to_text(network.list_networks(_get_client(), node))
+
+
+# --- Resize Tools ---
+
+
+@mcp.tool()
+def resize_guest(
+    vmid: int,
+    cores: int | None = None,
+    memory: int | None = None,
+    disk_size: str | None = None,
+    disk: str = "scsi0",
+    confirm: bool = False,
+) -> str:
+    """Resize CPU, memory, and/or disk of a VM or container.
+
+    At least one of cores, memory, or disk_size must be provided.
+    CPU and memory changes take effect on next reboot for running guests.
+    Disk resize is immediate but IRREVERSIBLE (disks can only grow).
+
+    Args:
+        vmid: The numeric ID of the VM or container.
+        cores: New number of CPU cores.
+        memory: New memory size in MB.
+        disk_size: Disk size change. Use '+10G' to add 10GB, or '50G' for absolute size.
+            Supported units: K, M, G, T.
+        disk: Disk name to resize (default 'scsi0' for VMs, auto-mapped to 'rootfs' for CTs).
+        confirm: Must be true to execute. First call without confirm shows a warning.
+    """
+    return _to_text(
+        resize.resize_guest(_get_client(), vmid, cores, memory, disk_size, disk, confirm)
+    )
+
+
+# --- Firewall Tools ---
+
+
+@mcp.tool()
+def list_firewall_rules(
+    vmid: int | None = None,
+    node: str | None = None,
+) -> str:
+    """List firewall rules. Can target a specific VM/CT, a node, or the cluster.
+
+    Args:
+        vmid: Optional. List rules for this VM/container.
+        node: Optional. List rules for this node. Ignored if vmid is provided.
+    If neither vmid nor node is provided, lists cluster-level rules.
+    """
+    return _to_text(firewall.list_firewall_rules(_get_client(), vmid, node))
+
+
+@mcp.tool()
+def add_firewall_rule(
+    action: str,
+    type_: str,
+    vmid: int | None = None,
+    node: str | None = None,
+    proto: str | None = None,
+    dport: str | None = None,
+    sport: str | None = None,
+    source: str | None = None,
+    dest: str | None = None,
+    iface: str | None = None,
+    enable: bool = True,
+    comment: str = "",
+    pos: int | None = None,
+) -> str:
+    """Add a firewall rule to a VM/CT, node, or cluster.
+
+    Args:
+        action: Rule action: 'ACCEPT', 'DROP', or 'REJECT'.
+        type_: Rule direction: 'in' (incoming) or 'out' (outgoing).
+        vmid: Optional. Add rule to this VM/container.
+        node: Optional. Add rule to this node. Ignored if vmid is provided.
+        proto: Optional. Protocol: 'tcp', 'udp', 'icmp', etc.
+        dport: Optional. Destination port or range (e.g. '80', '8000-9000', '80,443').
+        sport: Optional. Source port or range.
+        source: Optional. Source IP/CIDR (e.g. '192.168.1.0/24').
+        dest: Optional. Destination IP/CIDR.
+        iface: Optional. Network interface (e.g. 'net0').
+        enable: Enable rule immediately (default true).
+        comment: Optional description for the rule.
+        pos: Optional position in the rule chain (0 = first).
+    If neither vmid nor node is provided, adds a cluster-level rule.
+    """
+    return _to_text(
+        firewall.add_firewall_rule(
+            _get_client(),
+            action=action,
+            type_=type_,
+            vmid=vmid,
+            node=node,
+            proto=proto,
+            dport=dport,
+            sport=sport,
+            source=source,
+            dest=dest,
+            iface=iface,
+            enable=enable,
+            comment=comment,
+            pos=pos,
+        )
+    )
+
+
+@mcp.tool()
+def delete_firewall_rule(
+    pos: int,
+    vmid: int | None = None,
+    node: str | None = None,
+    confirm: bool = False,
+) -> str:
+    """Delete a firewall rule by its position number.
+
+    Use list_firewall_rules first to see rule positions.
+
+    Args:
+        pos: Position of the rule to delete (from list_firewall_rules output).
+        vmid: Optional. Delete from this VM/container's rules.
+        node: Optional. Delete from this node's rules. Ignored if vmid is provided.
+        confirm: Must be true to execute. First call without confirm shows a warning.
+    If neither vmid nor node is provided, deletes from cluster-level rules.
+    """
+    return _to_text(firewall.delete_firewall_rule(_get_client(), pos, vmid, node, confirm))
+
+
+# --- Migration Tools ---
+
+
+@mcp.tool()
+def migrate_guest(
+    vmid: int,
+    target_node: str,
+    online: bool = True,
+    confirm: bool = False,
+) -> str:
+    """Live migrate a VM or container to another node in the cluster.
+
+    Args:
+        vmid: The numeric ID of the VM or container to migrate.
+        target_node: Name of the destination node (e.g. 'pve2').
+        online: Live migration (true, default) or offline (false). Online keeps the guest running.
+        confirm: Must be true to execute. First call without confirm shows a warning.
+    """
+    return _to_text(migration.migrate_guest(_get_client(), vmid, target_node, online, confirm))
+
+
+# --- Template & Cloud-init Tools ---
+
+
+@mcp.tool()
+def list_templates() -> str:
+    """List all VM templates available in the cluster for cloning."""
+    return _to_text(templates.list_templates(_get_client()))
+
+
+@mcp.tool()
+def create_template(vmid: int, confirm: bool = False) -> str:
+    """Convert a stopped VM into a template. IRREVERSIBLE.
+
+    Once converted, the VM can no longer be started — it can only be cloned.
+
+    Args:
+        vmid: The numeric ID of the VM to convert.
+        confirm: Must be true to execute. First call without confirm shows a warning.
+    """
+    return _to_text(templates.create_template(_get_client(), vmid, confirm))
+
+
+@mcp.tool()
+def configure_cloud_init(
+    vmid: int,
+    user: str | None = None,
+    password: str | None = None,
+    ssh_keys: str | None = None,
+    ip_config: str | None = None,
+    nameserver: str | None = None,
+    searchdomain: str | None = None,
+) -> str:
+    """Configure cloud-init settings on a VM for automated provisioning.
+
+    At least one parameter must be provided. Changes take effect on next boot.
+
+    Args:
+        vmid: The numeric ID of the VM.
+        user: Default user name for cloud-init.
+        password: Password for the default user.
+        ssh_keys: SSH public keys (URL-encoded, newline-separated for multiple keys).
+        ip_config: IP configuration string (e.g. 'ip=dhcp' or 'ip=10.0.0.5/24,gw=10.0.0.1').
+        nameserver: DNS server IP(s), space-separated.
+        searchdomain: DNS search domain(s), space-separated.
+    """
+    return _to_text(
+        templates.configure_cloud_init(
+            _get_client(),
+            vmid=vmid,
+            user=user,
+            password=password,
+            ssh_keys=ssh_keys,
+            ip_config=ip_config,
+            nameserver=nameserver,
+            searchdomain=searchdomain,
+        )
+    )
+
+
+def main() -> None:
+    """Entry point for the MCP server."""
+    mcp.run()
+
+
+if __name__ == "__main__":
+    main()

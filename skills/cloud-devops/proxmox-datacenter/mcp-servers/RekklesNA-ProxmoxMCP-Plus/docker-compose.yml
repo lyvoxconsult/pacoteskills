@@ -1,0 +1,69 @@
+services:
+  proxmox-mcp-api:
+    build: .
+    ports:
+      - "8811:8811"
+    volumes:
+      - ./proxmox-config:/app/proxmox-config:ro
+    environment:
+      - PROXMOX_MCP_CONFIG=/app/proxmox-config/config.json
+      # Set PROXMOX_API_KEY in your shell or .env before starting OpenAPI mode.
+      - PROXMOX_API_KEY=${PROXMOX_API_KEY:?Set PROXMOX_API_KEY before starting OpenAPI mode}
+      - API_HOST=0.0.0.0
+      - API_PORT=8811
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8811/livez"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - proxmox-network
+
+  proxmox-mcp-http:
+    build: .
+    profiles:
+      - mcp-http
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./proxmox-config:/app/proxmox-config:ro
+    environment:
+      - PROXMOX_MCP_CONFIG=/app/proxmox-config/config.json
+      - PROXMOX_MCP_MODE=mcp-http
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8000
+      - MCP_TRANSPORT=STREAMABLE_HTTP
+      # Optional but strongly recommended for every remotely reachable deployment.
+      - MCP_ALLOW_UNAUTHENTICATED_HTTP=${MCP_ALLOW_UNAUTHENTICATED_HTTP:-false}
+      - MCP_API_KEY=${MCP_API_KEY:-}
+      # Optional OAuth + PKCE browser gate implemented with the MCP Python SDK.
+      # /authorize validates the OAuth request and redirects to /oauth/consent,
+      # where the user enters MCP_API_KEY. The client never receives the API key.
+      - MCP_OAUTH_ENABLED=${MCP_OAUTH_ENABLED:-false}
+      - MCP_OAUTH_ISSUER=${MCP_OAUTH_ISSUER:-}
+      - MCP_OAUTH_RESOURCE=${MCP_OAUTH_RESOURCE:-}
+      - MCP_OAUTH_SCOPES=${MCP_OAUTH_SCOPES:-mcp}
+      - MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS=${MCP_OAUTH_ACCESS_TOKEN_TTL_SECONDS:-3600}
+      - MCP_OAUTH_REFRESH_TOKEN_TTL_SECONDS=${MCP_OAUTH_REFRESH_TOKEN_TTL_SECONDS:-2592000}
+      - MCP_OAUTH_DATABASE_URL=${MCP_OAUTH_DATABASE_URL:-}
+      - MCP_OAUTH_KEY_VERSION=${MCP_OAUTH_KEY_VERSION:-1}
+      - MCP_OAUTH_MAX_REGISTERED_CLIENTS=${MCP_OAUTH_MAX_REGISTERED_CLIENTS:-4096}
+      - MCP_OAUTH_DB_POOL_MIN_SIZE=${MCP_OAUTH_DB_POOL_MIN_SIZE:-1}
+      - MCP_OAUTH_DB_POOL_MAX_SIZE=${MCP_OAUTH_DB_POOL_MAX_SIZE:-10}
+      - MCP_OAUTH_DB_COMMAND_TIMEOUT_SECONDS=${MCP_OAUTH_DB_COMMAND_TIMEOUT_SECONDS:-10}
+      - MCP_OAUTH_CLIENT_IP_HEADER=${MCP_OAUTH_CLIENT_IP_HEADER:-}
+      # For reverse proxy deployments, set explicit Host/Origin allowlists.
+      # - MCP_DNS_REBINDING_PROTECTION=true
+      # - MCP_ALLOWED_HOSTS=mcp.example.com:*,localhost:*
+      # - MCP_ALLOWED_ORIGINS=https://mcp.example.com
+      # Optionally expose only selected tools, or exclude selected tools. Do not set both.
+      # - MCP_TOOL_ALLOWLIST=get_nodes,get_vms,get_containers,get_storage
+      # - MCP_TOOL_DENYLIST=create_vm,delete_vm,create_container,delete_container
+    restart: unless-stopped
+    networks:
+      - proxmox-network
+
+networks:
+  proxmox-network:
+    driver: bridge

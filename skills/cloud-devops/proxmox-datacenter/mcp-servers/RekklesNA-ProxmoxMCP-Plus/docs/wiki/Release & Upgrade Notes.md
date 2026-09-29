@@ -1,0 +1,759 @@
+# Release & Upgrade Notes
+
+Use this page to track version-level behavior changes, upgrade steps, and rollback notes.
+
+## Release Entry Template
+
+### Version `<version>`
+
+- Release date:
+- Summary:
+- New tools or endpoints:
+- Changed behavior:
+- Removed or deprecated behavior:
+- Config changes:
+- Docs updated:
+- Upgrade steps:
+- Rollback notes:
+
+## Release History
+
+### Version `0.5.23`
+
+- Fix default command deny rules, LXC restore parameters, task cancellation, and poll/retry races.
+- Report backup query failures and partial results instead of an empty list.
+- Append job audit events separately with opt-in retention; stop workers and back up SQLite before upgrading.
+- Add opt-in Code Mode worker reuse with isolated sessions and a local benchmark.
+- Include PR #139's PgDog-compatible OAuth pool reset and matching asyncpg metadata.
+- See [v0.5.23 upgrade notes](../releases/v0.5.23.md).
+
+### Version `0.5.22`
+
+- Release date: 2026-09-26
+- Summary: opt-in MCP Streamable HTTP OAuth authorization-code flow with PKCE and PostgreSQL state (#138).
+- The existing API-key Bearer mode remains the default. OAuth mode requires PostgreSQL, an issuer URL, and the existing `MCP_API_KEY` as the human consent credential.
+- Browser consent never returns the API key to an OAuth client. Key-version rotation invalidates issued credentials across workers.
+- Security review hardens persisted key verification, HTTP startup validation, and authorization/refresh-token expiry checks.
+- Upgrade: install `proxmox-mcp-plus==0.5.22` or pull GHCR `0.5.22`. Configure OAuth explicitly if desired and reconnect clients. See [v0.5.22 notes](../releases/v0.5.22.md).
+
+
+### Version `0.5.21`
+
+- Release date: 2026-09-26
+- Summary: prevent long LXC commands from blocking MCP; add read-only `list_bridges` (#135).
+- Commands have a 60-second remote deadline plus 5-second kill grace, and a bounded local SSH wait. Containers require GNU coreutils `/usr/bin/timeout`.
+- Upgrade: install `proxmox-mcp-plus==0.5.21` or pull GHCR `0.5.21`, restart/reconnect clients; add `list_bridges` to explicit allowlists if desired.
+- Details and limitations: [v0.5.21 notes](../releases/v0.5.21.md).
+
+### Version `0.5.20`
+
+- Release date: 2026-09-24
+- Summary: detailed node CPU, load, memory, swap and root filesystem status (#134).
+- Preserve valid zero CPU samples; optional cluster CPU enrichment only fills missing readings and tolerates permission failures.
+- Show zero available memory; prefer `rootfs` with the legacy `disk` mapping as fallback.
+- Upgrade: install `proxmox-mcp-plus==0.5.20` or pull GHCR `0.5.20`, then restart/reconnect. No configuration migration required.
+- Details: [v0.5.20 notes](../releases/v0.5.20.md).
+
+### Version `0.5.19`
+
+- Release date: 2026-09-21
+- Summary: optional Code Mode, VM ISO and network configuration, LXC static addressing/network edits, and explicit externally protected HTTP authentication opt-out (#130, #131, #132).
+- New tool: `update_container_network`; preserve existing full-catalog and DHCP defaults.
+- Native HTTP: Streamable HTTP and SSE require a key unless `MCP_ALLOW_UNAUTHENTICATED_HTTP=true` is explicitly configured. A configured key is always enforced.
+- Release integrity: metadata/tag/archive version checks prevent the v0.5.18 tag-versus-package mismatch from recurring. Historical tags are retained.
+- Upgrade: install `proxmox-mcp-plus==0.5.19` or pull GHCR `0.5.19`, configure HTTP authentication and reconnect clients. See [v0.5.19 notes](../releases/v0.5.19.md).
+- Rollback: remove new config/filter entries first; existing guest changes are not reversed.
+
+### Version `0.5.17`
+
+- Release date: 2026-09-16
+- Summary: adds VM provisioning tools with target-aware approval and permission handling (#127).
+- New tools: `get_next_vmid`, `update_vm_config`, and `get_vm_ip_addresses`.
+- Safety: VM configuration updates follow the selected target's high-risk policy; read-only targets reject updates. Configuration writes do not require `VM.Audit`, and Guest Agent permission errors remain visible.
+- Configuration: the audit-only default is unchanged. Add `update_vm_config` to custom high-risk operation lists and add desired new tools to explicit allowlists.
+- Upgrade: install `proxmox-mcp-plus==0.5.17` or pull GHCR `0.5.17`, then restart/reconnect. See `docs/releases/v0.5.17.md`.
+- Rollback: `0.5.16` removes the three new tools; remove their names from explicit exposure lists first. Existing VM changes are not reverted.
+
+### Version `0.5.16`
+
+- Release date: 2026-09-12
+- Summary: fixes false `Quorum: NOT OK` reports for standalone nodes (#125).
+- Changed behavior: cluster metadata is selected by type; standalone name/quorum show `n/a (not clustered)`, while missing data shows `unknown`. Real quorum failures still show `NOT OK`.
+- Configuration: no changes or migrations required.
+- Upgrade: install `proxmox-mcp-plus==0.5.16` or pull GHCR `0.5.16`, then restart. See `docs/releases/v0.5.16.md`.
+- Rollback: `0.5.15` uses the same configuration but restores the reporting bug.
+
+### Version `0.5.15`
+
+- Release date: 2026-09-04
+- Summary: named Proxmox targets, opt-in tool filtering, and target/job safety hardening.
+- New tools: `list_targets`; the complete catalog contains 50 tools, subject to capability and exposure filters.
+- Configuration: optional `targets`, `mcp.tool_allowlist`, `mcp.tool_denylist`, `MCP_TOOL_ALLOWLIST`, and `MCP_TOOL_DENYLIST`.
+- Compatibility: legacy single-target configuration and unfiltered tool schemas remain available unchanged.
+- Safety: target-isolated jobs and policies, explicit multi-target selection, credential redaction, external tunnel ownership, and rejection of malformed filters.
+- Packaging: named-target SQLite databases and their WAL/SHM files are excluded from Git and Docker contexts.
+- Documentation: the Integrations Guide links the attributed, maintainer-reviewed Jetson community guide.
+- Upgrade: install `proxmox-mcp-plus==0.5.15` or pull GHCR `0.5.15`, then restart/reconnect clients. See the detailed release notes in `docs/releases/v0.5.15.md`.
+- Rollback: keep configuration/database backups. Version `0.5.14` does not support named targets or tool filtering; restore a legacy single-target configuration and external access restrictions before rolling back.
+
+### Version `0.5.14`
+
+- Release date: 2026-08-11
+- Summary: adds optional Bearer authentication for the native Streamable HTTP `/mcp` endpoint.
+- New tools or endpoints:
+  - no new tools or endpoint paths
+- Changed behavior:
+  - setting `MCP_API_KEY` requires `Authorization: Bearer <MCP_API_KEY>` for native `/mcp` requests
+  - missing, malformed, or incorrect credentials return `401` with `WWW-Authenticate: Bearer`
+  - unauthenticated Streamable HTTP remains available for backward compatibility but logs a security warning
+  - successful SSE responses pass through the authentication layer without buffering
+- Removed or deprecated behavior:
+  - no removals or deprecations
+- Config changes:
+  - optional `MCP_API_KEY` environment variable for native Streamable HTTP only
+  - `PROXMOX_API_KEY` remains exclusive to the OpenAPI bridge
+- Docs updated:
+  - `README.md`
+  - `docs/releases/v0.5.14.md`
+  - `docs/wiki/API & Tool Reference.md`
+  - `docs/wiki/Home.md`
+  - `docs/wiki/Integrations Guide.md`
+  - `docs/wiki/Operator Guide.md`
+  - `docs/wiki/Security Guide.md`
+  - `docs/wiki/Troubleshooting.md`
+  - `docs/wiki/Release & Upgrade Notes.md`
+  - `docs/llms.txt`
+- Upgrade steps:
+  - generate a separate `MCP_API_KEY` for every remotely reachable native MCP HTTP deployment
+  - configure clients to send the Bearer header on every `/mcp` request
+  - retain TLS, ingress controls, and Host/Origin validation alongside caller authentication
+- Rollback notes:
+  - pin PyPI or source installs to `0.5.13`, or use the GHCR tag `0.5.13`
+  - retain external authentication when rolling back because `0.5.13` does not enforce `MCP_API_KEY`
+
+### Version `0.5.13`
+
+- Release date: 2026-08-10
+- Summary: adds five read-only Proxmox log inspection tools and prevents CPython finalization aborts during STDIO signal shutdown.
+- New tools or endpoints:
+  - `get_node_syslog`
+  - `get_task_log`
+  - `get_cluster_log`
+  - `get_node_firewall_log`
+  - `get_guest_firewall_log` for QEMU VMs and LXC containers
+- Changed behavior:
+  - STDIO now closes application resources and exits without interpreter finalization when SIGINT or SIGTERM is received
+  - SSE and Streamable HTTP retain their existing `SystemExit` shutdown behavior
+  - log access remains governed by Proxmox permissions; the user or API token may need `Sys.Syslog`, `Sys.Audit`, or `VM.Console` depending on the endpoint and target
+  - returned logs may include sensitive operational details and should be shared only after review
+- Removed or deprecated behavior:
+  - no removals or deprecations
+- Config changes:
+  - no runtime configuration migration
+- Docs updated:
+  - `README.md`
+  - `docs/releases/v0.5.13.md`
+  - `docs/wiki/API & Tool Reference.md`
+  - `docs/wiki/Tool Selection Guide.md`
+  - `docs/wiki/Release & Upgrade Notes.md`
+- Upgrade steps:
+  - upgrade normally from PyPI, GHCR, or source
+  - reconnect or refresh the MCP client if it caches the server's tool list
+  - grant only the Proxmox log permissions required by the inspection workflow
+- Rollback notes:
+  - pin PyPI or source installs to `0.5.12`, or use the GHCR tag `0.5.12`
+
+### Version `0.5.12`
+
+- Release date: 2026-07-29
+- Summary: pins every third-party Docker Action used by the GHCR release workflow to a reviewed immutable commit SHA.
+- New tools or endpoints:
+  - no new runtime tools or endpoints
+- Changed behavior:
+  - `docker/login-action` is pinned to the signed v4.6.0 commit
+  - `docker/metadata-action` is pinned to the signed v6.2.0 commit
+  - `docker/build-push-action` is pinned to the signed v7.3.0 commit
+  - a regression test rejects mutable refs for every `docker/*` Action in the container release workflow
+  - the v0.5.11 native AMD64/ARM64 build and post-publication ARM64 health gate remain unchanged
+- Removed or deprecated behavior:
+  - no removals or deprecations
+- Config changes:
+  - no runtime configuration migration
+- Docs updated:
+  - `docs/releases/v0.5.12.md`
+  - `docs/wiki/Release & Upgrade Notes.md`
+- Upgrade steps:
+  - upgrade normally from PyPI, GHCR, or source
+  - no application or Docker configuration change is required
+- Rollback notes:
+  - downgrade to `v0.5.11` only if the pinned release workflow is incompatible with a repository-specific Actions policy
+
+### Version `0.5.11`
+
+- Release date: 2026-07-29
+- Summary: publishes the GHCR container as a native multi-architecture image for AMD64 and ARM64 hosts (closes issue #109).
+- New tools or endpoints:
+  - no new runtime tools or endpoints
+- Changed behavior:
+  - GHCR release tags now contain native `linux/amd64` and `linux/arm64` images under one multi-architecture manifest
+  - Docker automatically selects the matching image on Apple Silicon and other ARM64 hosts instead of falling back to AMD64 emulation
+  - the release workflow limits QEMU registration to ARM64, pins the new QEMU and Buildx actions to reviewed commit SHAs, and pins the QEMU helper image by OCI digest
+  - Docker build contexts exclude local tool state, environment files, private-key patterns, and non-example Proxmox JSON configuration files
+  - the final runtime image removes `pip`, `setuptools`, and `wheel` after installation to reduce dormant build-tool attack surface
+  - the multi-architecture Python base image is pinned by OCI digest
+  - a native ARM64 release job pulls the published image and verifies its manifest, architecture, non-root runtime, and `/livez` endpoint
+- Removed or deprecated behavior:
+  - no removals or deprecations
+- Config changes:
+  - no runtime configuration migration
+- Docs updated:
+  - `docs/releases/v0.5.11.md`
+  - `docs/wiki/Release & Upgrade Notes.md`
+- Upgrade steps:
+  - pull `ghcr.io/rekklesna/proxmoxmcp-plus:0.5.11` or `latest` normally; Docker selects the host architecture automatically
+  - no Compose or MCP client configuration change is required
+- Rollback notes:
+  - use `v0.5.10` if a registry or Docker installation cannot consume a multi-architecture manifest
+
+### Version `0.5.10`
+
+- Release date: 2026-07-23
+- Summary: adds first-class MCP tools for setting or clearing the Proxmox Notes field on individual QEMU VMs and LXC containers.
+- New tools or endpoints:
+  - `set_vm_description`
+  - `set_container_description`
+- Changed behavior:
+  - callers can replace a VM or container description through the native Proxmox config endpoint
+  - passing an empty description clears the existing Notes field
+  - each call targets exactly one `node` and `vmid`; no selector or multi-target behavior is introduced
+- Removed or deprecated behavior:
+  - no removals or deprecations
+- Config changes:
+  - no runtime configuration migration
+- Docs updated:
+  - `docs/releases/v0.5.10.md`
+  - `docs/wiki/API & Tool Reference.md`
+  - `docs/wiki/Release & Upgrade Notes.md`
+- Upgrade steps:
+  - no migration is required
+  - ensure the configured Proxmox API token can update the target VM or container configuration before using the new tools
+- Rollback notes:
+  - downgrade to `v0.5.9` only if a client cannot accept the two additional MCP tool definitions
+
+### Version `0.5.9`
+
+- Release date: 2026-07-16
+- Summary: adds optional Proxmox resource-pool targeting to VM and LXC creation, enabling pool-scoped API-token security boundaries (closes issue #104).
+- New tools or endpoints:
+  - no new runtime tools or endpoints
+- Changed behavior:
+  - `create_vm` accepts an optional `pool` argument and forwards it to `POST /nodes/{node}/qemu`
+  - `create_container` accepts an optional `pool` argument and forwards it to `POST /nodes/{node}/lxc`
+  - omitting `pool` preserves the previous request payload and behavior
+  - tests use Starlette's supported `httpx2` client path, eliminating the deprecated `httpx` fallback warning
+  - the development test stack now requires `pytest>=9.0.3` and `pytest-asyncio>=1.4.0`, removing the vulnerable pytest versions reported as `PYSEC-2026-1845`
+- Removed or deprecated behavior:
+  - no removals or deprecations
+- Config changes:
+  - no required runtime config migration
+  - development/test installs now include `httpx2>=2.0.0,<3.0.0`, `pytest>=9.0.3,<10.0.0`, and `pytest-asyncio>=1.4.0,<2.0.0`
+- Docs updated:
+  - `docs/releases/v0.5.9.md`
+  - `docs/wiki/API & Tool Reference.md`
+  - `docs/wiki/Release & Upgrade Notes.md`
+- Upgrade steps:
+  - no required migration
+  - pass `pool=<resource-pool-name>` only when VM/LXC creation should be scoped to a Proxmox resource pool
+  - grant `Pool.Allocate` on the target pool in addition to the required VM permissions
+- Rollback notes:
+  - downgrade to `v0.5.8` only if a client cannot accept the two new optional schema fields; omitting them is already backward compatible
+
+### Version `0.5.8`
+
+- Release date: 2026-06-07
+- Summary: Windows / headless SSH compatibility fixes for `execute_container_command` and `get_node_status` (closes issue #100).
+- New tools or endpoints:
+  - no new runtime tools or endpoints
+- Changed behavior:
+  - `_execute_via_system_ssh()` now passes `-l <user>`, `stdin=DEVNULL`, `-o BatchMode=yes`, and `-o StrictHostKeyChecking=accept-new` so OpenSSH works on Windows and in headless / TTY-less environments
+  - `get_node_status()` now injects `status: "online"` when the API response omits the field, fixing the always-UNKNOWN display
+  - `node_status()` template now reads CPU core count from `cpuinfo.cpus` (with a `maxcpu` fallback), fixing the always-N/A display
+- Removed or deprecated behavior:
+  - no removals or deprecations
+- Config changes:
+  - no required config migration
+- Docs updated:
+  - `docs/releases/v0.5.8.md`
+  - `docs/wiki/Release & Upgrade Notes.md`
+- Upgrade steps:
+  - no required migration
+- Rollback notes:
+  - downgrade to `v0.5.7` only if a Windows deployment needs to keep the previous SSH command shape; doing so restores the broken behaviour fixed in this release
+
+### Version `0.5.7`
+
+- Release date: 2026-05-30
+- Summary: visual documentation release that replaces the README hero architecture diagram with a publication-style SVG grounded in the actual ProxmoxMCP-Plus runtime architecture.
+- New tools or endpoints:
+  - no new runtime tools or endpoints
+- Changed behavior:
+  - no runtime behavior changes
+- Removed or deprecated behavior:
+  - no removals or deprecations
+- Config changes:
+  - no required config migration
+- Docs updated:
+  - `README.md`
+  - `docs/assets/proxmoxmcp-nature-architecture.svg`
+  - `docs/releases/v0.5.7.md`
+  - `docs/wiki/Release & Upgrade Notes.md`
+- Upgrade steps:
+  - no required migration
+- Rollback notes:
+  - downgrade to `v0.5.6` only if a downstream documentation renderer cannot display the new SVG asset
+
+### Version `0.5.6`
+
+- Release date: 2026-05-30
+- Summary: documentation experience release that reorganizes the GitHub README and wiki around installation, client setup, tool choice, safety, and release documentation quality.
+- New tools or endpoints:
+  - no new runtime tools or endpoints
+- Changed behavior:
+  - no runtime behavior changes
+- Removed or deprecated behavior:
+  - no removals or deprecations
+- Config changes:
+  - no required config migration
+- Docs updated:
+  - `README.md`
+  - `docs/llms.txt`
+  - `docs/releases/v0.5.6.md`
+  - `docs/wiki/Client Setup.md`
+  - `docs/wiki/Documentation Quality Plan.md`
+  - `docs/wiki/Home.md`
+  - `docs/wiki/Integrations Guide.md`
+  - `docs/wiki/Release & Upgrade Notes.md`
+  - `docs/wiki/Tool Selection Guide.md`
+  - `docs/wiki/_Sidebar.md`
+- Upgrade steps:
+  - no required migration
+  - review the new Client Setup and Tool Selection Guide pages when onboarding new MCP clients
+- Rollback notes:
+  - downgrade to `v0.5.5` only if a deployment needs to stay on the previous package metadata; doing so removes the improved README, wiki routing, and LLM documentation index
+
+### Version `0.5.5`
+
+- Release date: 2026-05-29
+- Summary: quality-gate release that closes API SSH tunnels during server shutdown, validates CI on Python 3.11 and 3.12, and raises the enforced coverage gate to 75%.
+- New tools or endpoints:
+  - no new runtime tools or endpoints
+- Changed behavior:
+  - server shutdown now explicitly releases the Proxmox API SSH tunnel manager instead of relying only on process exit cleanup
+  - CI runs the validation stack against Python 3.11 and 3.12
+  - coverage enforcement increased from 70% to 75%
+- Config changes:
+  - no required config migration
+- Docs updated:
+  - `README.md`
+  - `docs/releases/v0.5.5.md`
+  - `docs/wiki/Developer Guide.md`
+  - `docs/wiki/Home.md`
+  - `docs/wiki/Release & Upgrade Notes.md`
+- Upgrade steps:
+  - no required migration
+- Rollback notes:
+  - downgrade to `v0.5.4` only if Python 3.12 CI validation or stricter coverage gates block urgent maintenance work
+
+### Version `0.5.4`
+
+- Release date: 2026-05-29
+- Summary: quality and release-safety update that raises the coverage gate, adds user-path tests for high-traffic tools, enforces release metadata parity, removes unused utility code, improves Docker build caching, and makes boolean environment parsing consistent.
+- New tools or endpoints:
+  - no new runtime tools or endpoints
+- Changed behavior:
+  - invalid boolean environment values now fail startup validation instead of being interpreted as false
+  - manifest parity tests now exercise the runtime plugin registration path rather than parsing source text
+  - Docker builds can reuse the package-install layer when only repository files outside package metadata/source change
+- Removed or deprecated behavior:
+  - removed the unused `proxmox_mcp.utils` package
+- Config changes:
+  - `PROXMOX_VERIFY_SSL`, `PROXMOX_API_TUNNEL_ENABLED`, `PROXMOX_DEV_MODE`, `COMMAND_POLICY_REQUIRE_APPROVAL_TOKEN`, and `COMMAND_POLICY_HIGH_RISK_REQUIRE_APPROVAL_TOKEN` now share strict boolean parsing
+- Docs updated:
+  - `README.md`
+  - `docs/releases/v0.5.4.md`
+  - `docs/wiki/Developer Guide.md`
+  - `docs/wiki/Home.md`
+  - `docs/wiki/Release & Upgrade Notes.md`
+- Upgrade steps:
+  - no required migration
+  - check deployment environment files for invalid boolean strings before upgrading
+- Rollback notes:
+  - downgrade to `v0.5.3` only if a deployment depends on previously invalid boolean values being treated as false; doing so removes the stronger metadata and coverage guardrails
+
+### Version `0.5.3`
+
+- Release date: 2026-05-27
+- Summary: security-hardening release that aligns the published manifest with all runtime tools, redacts command and error logs, bounds OpenAPI rate-limiter bucket growth, adds configurable MCP DNS rebinding protection, and expands regression coverage for high-risk operations.
+- New tools or endpoints:
+  - no new runtime tools or endpoints; `manifest.json` now declares all 42 registered tools
+- Changed behavior:
+  - VM and LXC command execution logs no longer include command text, command output, or command error content
+  - OpenSSH LXC execution and API SSH tunnel debug logs no longer expose full command lines or local SSH key paths
+  - OpenAPI job route errors log sanitized summaries instead of raw traceback text
+  - the OpenAPI rate limiter periodically removes expired empty client buckets
+  - MCP HTTP transports can opt into explicit DNS rebinding protection, Host allowlists, and Origin allowlists
+- Config changes:
+  - added `mcp.dns_rebinding_protection`, `mcp.allowed_hosts`, and `mcp.allowed_origins`
+  - added `MCP_DNS_REBINDING_PROTECTION`, `MCP_ALLOWED_HOSTS`, and `MCP_ALLOWED_ORIGINS`
+- Docs updated:
+  - `docs/releases/v0.5.3.md`
+  - `docs/wiki/Release & Upgrade Notes.md`
+  - `docs/wiki/Security Guide.md`
+  - `docs/wiki/Operator Guide.md`
+  - `docs/wiki/Integrations Guide.md`
+- Upgrade steps:
+  - no required migration for stdio deployments
+  - configure allowed hosts and origins before exposing HTTP transports behind a reverse proxy
+- Rollback notes:
+  - downgrade to `v0.5.2` only if the deployment cannot run the MCP SDK version needed for configured transport security; doing so reopens manifest drift and log-redaction gaps
+
+### Version `0.5.2`
+
+- Release date: 2026-05-12
+- Summary: job concurrency and operator-safety patch that atomically claims retries, protects cancel writes from stale UPIDs, aligns legacy packaging constraints, and extends high-risk approval policy to SSH key injection.
+- New tools or endpoints:
+  - no new tools or endpoints
+- Changed behavior:
+  - `retry_job` moves eligible jobs to `retrying` before replaying an operation, so concurrent retries conflict instead of running twice
+  - `cancel_job` records `cancel_discarded` instead of overwriting a newer UPID or terminal/retrying state
+  - `update_container_ssh_keys` is now treated as a high-risk operation
+  - `get_containers(include_raw=true, format_style="json")` includes `raw_status` and `raw_config` when stats are fetched
+  - API SSH tunnels honor configured SSH user, port, key file, known hosts file, and strict host-key checking
+  - logging setup replaces project-managed handlers instead of accumulating duplicates
+- Config changes:
+  - `COMMAND_POLICY_HIGH_RISK_OPERATIONS` defaults now include `update_container_ssh_keys`
+  - legacy `setup.py` installs now require `paramiko>=5.0.0,<6.0.0`
+- Docs updated:
+  - `docs/releases/v0.5.2.md`
+  - `docs/wiki/Release & Upgrade Notes.md`
+- Upgrade steps:
+  - pass `approval_token` to `update_container_ssh_keys` when high-risk approval enforcement is enabled
+  - retry clients should treat `retrying` as an in-progress state and poll the job before another retry
+- Rollback notes:
+  - downgrade to `v0.5.1` only if callers cannot yet pass approval tokens for SSH key updates; doing so reopens duplicate retry and stale cancel risks
+
+### Version `0.5.1`
+
+- Release date: 2026-05-12
+- Summary: persistent job safety patch that blocks duplicate retries for running or completed jobs, discards stale poll results after a retry swaps UPIDs, and protects direct OpenAPI `/jobs` routes when an app is created with an API key but without strict middleware.
+- New tools or endpoints:
+  - no new tools or endpoints
+- Changed behavior:
+  - `retry_job` only replays jobs in `failed`, `cancelled`, or `cancel_requested` states
+  - `poll_job` records `poll_discarded` instead of overwriting a job when the polled UPID is stale
+  - direct OpenAPI `/jobs` routes reuse API-key verification in non-strict `create_app` usage
+- Config changes:
+  - no required config migration
+- Docs updated:
+  - `docs/releases/v0.5.1.md`
+  - `docs/wiki/Release & Upgrade Notes.md`
+- Upgrade steps:
+  - poll jobs before retrying and retry only failed or cancelled jobs
+  - keep sending `Authorization: Bearer <PROXMOX_API_KEY>` for OpenAPI job routes
+- Rollback notes:
+  - downgrade to `v0.5.0` only if callers depend on retrying completed jobs; doing so reopens the duplicate-operation risk
+
+### Version `0.5.0`
+
+- Release date: 2026-05-11
+- Summary: OpenAPI security baseline release with required API-key startup, project-owned constant-time auth middleware, auth-failure rate limiting, split liveness/readiness probes, live E2E auth updates, and Paramiko 5.0.0.
+- New tools or endpoints:
+  - `/livez` for unauthenticated process liveness
+  - `/readyz` for authenticated backend readiness
+- Changed behavior:
+  - OpenAPI mode refuses to start without `PROXMOX_API_KEY` unless `PROXMOX_ALLOW_NO_AUTH=true` is set
+  - OpenAPI requests require `Authorization: Bearer <PROXMOX_API_KEY>` by default
+  - OpenAPI API key verification uses project-owned constant-time comparison
+  - auth failures pass through rate limiting before the auth decision
+  - `/health` remains available as an authenticated readiness alias
+  - live E2E and Docker OpenAPI checks send Bearer auth
+  - `scripts/start_openapi.sh` uses `.venv/bin/python` for proxy startup and dependency checks
+- Removed or deprecated behavior:
+  - unauthenticated OpenAPI startup is no longer the default
+  - the temporary `CVE-2026-44405` `pip-audit` exception is removed
+- Config changes:
+  - `PROXMOX_API_KEY` is required for OpenAPI mode unless `PROXMOX_ALLOW_NO_AUTH=true`
+  - runtime dependency support now requires `paramiko>=5.0.0,<6.0.0`
+- Docs updated:
+  - `README.md`
+  - `docs/examples/*.md`
+  - `docs/releases/v0.5.0.md`
+  - `docs/security/paramiko-cve-2026-44405.md`
+  - `docs/wiki/API & Tool Reference.md`
+  - `docs/wiki/Developer Guide.md`
+  - `docs/wiki/Home.md`
+  - `docs/wiki/Integrations Guide.md`
+  - `docs/wiki/Operator Guide.md`
+  - `docs/wiki/Release & Upgrade Notes.md`
+  - `docs/wiki/Security Guide.md`
+- Upgrade steps:
+  - set `PROXMOX_API_KEY` before starting OpenAPI mode
+  - update HTTP clients to send `Authorization: Bearer <PROXMOX_API_KEY>`
+  - use `/livez` for unauthenticated process liveness
+  - use authenticated `/readyz` or `/health` for backend readiness
+  - verify SSH endpoints do not depend on legacy RSA/SHA-1, SHA-1 KEX, or GSSAPI before adopting Paramiko 5
+- Rollback notes:
+  - downgrade to `v0.4.9` if clients cannot yet send OpenAPI auth headers, but keep the Paramiko CVE tracking and OpenAPI no-auth exposure in mind
+
+### Version `0.4.9`
+
+- Release date: 2026-05-09
+- Summary: supersedes `v0.4.8` with the same reliability hardening plus a CodeQL-blocking log-injection fix for high-risk retry audit logs.
+- New tools or endpoints:
+  - no new tools
+- Changed behavior:
+  - high-risk retry audit logs sanitize job IDs and persisted tool names before logging
+  - all `v0.4.8` production reliability changes are included
+- Config changes:
+  - no required config migration
+- Docs updated:
+  - `docs/releases/v0.4.9.md`
+  - `docs/wiki/Release & Upgrade Notes.md`
+- Upgrade steps:
+  - prefer `v0.4.9` over `v0.4.8`
+  - continue passing `include_stats=true` to `get_containers` if callers require detailed stats by default
+- Rollback notes:
+  - use `v0.4.7` rather than `v0.4.8` if rollback is required for the log-sanitization fix
+
+### Version `0.4.8`
+
+- Release date: 2026-05-09
+- Summary: production reliability and release-quality hardening for persistent jobs, inventory reads, OpenAPI job controls, metrics, Paramiko tracking, and `clone_vm`.
+- New tools or endpoints:
+  - no new tools
+- Changed behavior:
+  - `clone_vm` now registers persistent jobs and returns a stable Job ID
+  - high-risk job retries now pass through the same approval-token policy checks as direct tool execution
+  - VM guest-agent commands poll until exit and report non-zero exit codes as failures
+  - `get_vms` and default `get_containers` use cluster resource inventory to avoid large N+1 scans
+  - `get_containers` defaults `include_stats=false`; detailed per-container status/config/RRD remains opt-in
+  - OpenAPI metrics use route templates instead of raw paths for request labels
+  - `JobStore` SQLite uses WAL, busy timeout, migration tracking, indexes, SQL filtering/limits, and explicit close lifecycle
+- Config changes:
+  - no required config migration
+  - runtime dependency support now allows `paramiko>=4.0.0,<5.0.0`
+- Docs updated:
+  - `README.md`
+  - `docs/releases/v0.4.8.md`
+  - `docs/security/paramiko-cve-2026-44405.md`
+  - `docs/wiki/API & Tool Reference.md`
+  - `docs/wiki/Developer Guide.md`
+  - `docs/wiki/Home.md`
+  - `docs/wiki/Release & Upgrade Notes.md`
+- Upgrade steps:
+  - pass `include_stats=true` to `get_containers` if callers require detailed stats by default
+  - monitor Paramiko releases and remove the temporary `CVE-2026-44405` audit exception once a fixed PyPI release exists
+- Rollback notes:
+  - downgrade to `v0.4.7` if clients depend on default container stats, but keep the Paramiko CVE tracking in mind
+
+### Version `0.4.7`
+
+- Release date: 2026-05-08
+- Summary: adds a Docker-native MCP Streamable HTTP runtime so remote MCP clients can connect to `/mcp` without going through the OpenAPI bridge.
+- New tools or endpoints:
+  - Docker Compose profile `mcp-http` exposes native MCP Streamable HTTP at `http://<host>:8000/mcp`
+- Changed behavior:
+  - the Docker image now starts through `proxmox_mcp.docker_entrypoint`
+  - OpenAPI mode remains the default Docker runtime on port `8811`
+  - `MCP_HOST`, `MCP_PORT`, and `MCP_TRANSPORT` can override the `mcp` section from a mounted config file
+- Config changes:
+  - optional `PROXMOX_MCP_MODE=mcp-http` selects native MCP HTTP mode in Docker
+- Docs updated:
+  - `README.md`
+  - `docs/releases/v0.4.7.md`
+  - `docs/wiki/API & Tool Reference.md`
+  - `docs/wiki/Integrations Guide.md`
+  - `docs/wiki/Operator Guide.md`
+- Upgrade steps:
+  - no migration required
+  - continue using the default Docker mode for OpenAPI clients
+  - use `docker compose --profile mcp-http up -d proxmox-mcp-http` for Streamable HTTP MCP clients
+
+### Version `0.4.6`
+
+- Release date: 2026-05-02
+- Summary: fixes API tunnel routing, cross-process job visibility, secret persistence in LXC retry specs, snapshot rollback safety, and storage status node selection.
+- Changed behavior:
+  - `api_tunnel.enabled=true` now routes Proxmox API calls to the local tunnel endpoint
+  - OpenAPI `/jobs` refreshes persisted SQLite records before reads and job controls
+  - `create_container` no longer persists retry recipes when container passwords or SSH public keys are present
+  - `rollback_snapshot` refuses to continue when newer child snapshots exist instead of deleting them implicitly
+  - `get_storage` queries status through real Proxmox nodes instead of `localhost`
+- Config changes:
+  - no required config changes
+- Docs updated:
+  - `docs/releases/v0.4.6.md`
+- Upgrade steps:
+  - no migration required
+  - if you use snapshot rollback, explicitly delete newer child snapshots before retrying rollback
+
+### Version `0.4.5`
+
+- Release date: 2026-05-01
+- Summary: fixes Home Assistant MCP compatibility for `get_containers` by removing the nested `$ref` payload schema while retaining legacy payload calls.
+- Changed behavior:
+  - `get_containers` now exposes flat top-level MCP arguments
+  - legacy `payload` object input remains accepted for existing clients
+- Config changes:
+  - no required config changes
+- Docs updated:
+  - `docs/releases/v0.4.5.md`
+  - `docs/wiki/API & Tool Reference.md`
+- Upgrade steps:
+  - no migration required
+
+### Version `0.4.4`
+
+- Release date: 2026-04-28
+- Summary: updates GitHub Actions workflow dependencies to current Node 24-compatible major versions.
+- Changed behavior:
+  - no runtime behavior changes
+- Config changes:
+  - no required config changes
+- Docs updated:
+  - `docs/releases/v0.4.4.md`
+- Upgrade steps:
+  - no migration required
+
+### Version `0.4.3`
+
+- Release date: 2026-04-28
+- Summary: adds the `clone_vm` MCP tool for cloning existing Proxmox QEMU virtual machines.
+- New tools or endpoints:
+  - MCP tool: `clone_vm`
+- Changed behavior:
+  - no behavior changes to existing tools
+- Config changes:
+  - no required config changes
+- Docs updated:
+  - `docs/releases/v0.4.3.md`
+- Upgrade steps:
+  - no migration required
+  - confirm the configured Proxmox API token has VM clone permissions before using `clone_vm`
+
+### Version `0.4.2`
+
+- Release date: 2026-04-28
+- Summary: restores and updates the LXC container command execution setup guide for the current SSH-backed `pct exec` implementation.
+- Changed behavior:
+  - no runtime behavior changes
+- Config changes:
+  - `proxmox-config/config.example.json` now shows the recommended `mcp-agent` SSH user, `use_sudo=true`, and `known_hosts_file` setup
+- Docs updated:
+  - `docs/container-command-execution.md`
+  - `docs/wiki/Container Command Execution.md`
+  - `README.md`
+  - `docs/releases/v0.4.2.md`
+- Upgrade steps:
+  - no migration required
+  - if enabling container command execution, review the updated SSH and `command_policy` setup
+
+### Version `0.4.1`
+
+- Release date: 2026-04-25
+- Summary: fixes first-run documentation and client example configuration issues found after the 0.4.0 release.
+- Changed behavior:
+  - no runtime behavior changes
+- Config changes:
+  - client examples now default to `PROXMOX_VERIFY_SSL=true`
+  - examples that expose TLS mode also include `PROXMOX_DEV_MODE`
+- Docs updated:
+  - `README.md`
+  - `docs/releases/v0.4.1.md`
+  - `proxmox-config/opencode/README.md`
+- Upgrade steps:
+  - no migration required
+  - for self-signed lab endpoints, set both `PROXMOX_VERIFY_SSL=false` and `PROXMOX_DEV_MODE=true`
+
+### Version `0.4.0`
+
+- Release date: 2026-04-25
+- Summary: production-readiness pass for release packaging, Docker runtime size, dependency consistency, OpenAPI security visibility, and client-safe text output.
+- Changed behavior:
+  - runtime output now uses ASCII-safe labels and bullets instead of emoji glyphs
+  - Docker installs only production package dependencies and runs as a non-root user
+  - OpenAPI `/health` includes `security_warnings`
+- Config changes:
+  - no required config changes
+  - production OpenAPI deployments should set `PROXMOX_API_KEY`, `PROXMOX_STRICT_AUTH=true`, and a specific `MCPO_CORS_ALLOW_ORIGINS`
+- Docs updated:
+  - `docs/releases/v0.4.0.md`
+- Upgrade steps:
+  - rebuild Docker images from this release
+  - review OpenAPI security warnings after startup
+  - verify clients do not rely on emoji prefixes in tool output
+
+### Version `0.3.0`
+
+- Release date: 2026-04-24
+- Summary: adds a persistent SQLite-backed job layer for long-running Proxmox tasks, direct OpenAPI job routes, richer OpenAPI operational endpoints, and plugin-based tool registration.
+- New tools or endpoints:
+  - MCP tools: `list_jobs`, `get_job`, `poll_job`, `cancel_job`, `retry_job`
+  - OpenAPI routes: `GET /jobs`, `GET /jobs/{job_id}`, `POST /jobs/{job_id}/poll`, `POST /jobs/{job_id}/cancel`, `POST /jobs/{job_id}/retry`
+  - OpenAPI route: `/metrics`
+- Changed behavior:
+  - async mutating tools now return a stable `job_id` in addition to raw Proxmox `task_id`
+  - tool registration now flows through built-in registry plugins instead of one growing `server.py` block
+  - high-risk operations can be policy-gated separately from command execution
+- Removed or deprecated behavior:
+  - none
+- Config changes:
+  - new `jobs.sqlite_path`
+  - new optional `api_tunnel` section
+  - expanded `command_policy` with high-risk operation controls
+- Docs updated:
+  - `README.md`
+  - `docs/wiki/Home.md`
+  - `docs/wiki/Operator Guide.md`
+  - `docs/wiki/API & Tool Reference.md`
+  - `docs/wiki/Troubleshooting.md`
+  - `docs/wiki/Developer Guide.md`
+- Upgrade steps:
+  - add a persistent path for `jobs.sqlite_path` in long-lived deployments
+  - update config from `proxmox-config/config.example.json`
+  - if you depend on async tooling, switch client logic to keep `job_id` and not just `task_id`
+  - if you use OpenAPI, update monitors and clients to account for `/metrics` and `/jobs`
+- Rollback notes:
+  - older versions cannot read back persisted jobs through `/jobs`
+  - clients written against `job_id` should be reverted together with the server downgrade
+
+## Suggested Upgrade Checklist
+
+Before upgrading:
+
+- review changes to config examples
+- review command policy defaults
+- review OpenAPI wrapper behavior if your deployment depends on `/livez`, `/readyz`, `/health`, or auth
+- check whether any new tool requires extra credentials or runtime dependencies
+
+After upgrading:
+
+- start the service and confirm config validation still passes
+- call `get_nodes` and `get_cluster_status`
+- verify expected tools are still registered
+- verify unauthenticated `/livez` plus authenticated `/readyz`, `/health`, and `/docs` if you run the OpenAPI proxy
+- test at least one mutating workflow in a safe environment
+
+## Suggested Release Checklist
+
+- run `pytest -q --cov=proxmox_mcp --cov-report=term-missing --cov-fail-under=75`
+- run `ruff check .`
+- run `mypy src --ignore-missing-imports`
+- run `pip-audit -r requirements.txt`
+- build the package
+- confirm `README.md` and `docs/wiki/` reflect the released behavior
+- note any user-visible changes here
+
+## Existing Notes
+
+Older release history has not been backfilled yet.

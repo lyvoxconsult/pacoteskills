@@ -16,6 +16,7 @@ O foco é permitir que outro agente ou outra máquina consigam reconstruir o amb
 ## Estrutura
 
 - `skills/`: catálogo principal de skills disponíveis.
+- `skills/cloud-devops/proxmox-datacenter/`: pacote isolado para Proxmox VE, MCPs Proxmox e gerenciamento de datacenter.
 - `skills obrigatorias/`: definição do pack obrigatório, manifestos e documentação operacional.
 - `comercial/`: hub de skills e playbooks especializados para vendas, marketing, CRM e negócios.
 - `Ultra tokens/`: seleção curada e portátil de skills para economia de tokens, engenharia de prompt, contexto, raciocínio e entrega ágil.

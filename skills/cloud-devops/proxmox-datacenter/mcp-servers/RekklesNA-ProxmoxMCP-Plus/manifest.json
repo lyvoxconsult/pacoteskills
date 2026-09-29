@@ -1,0 +1,337 @@
+{
+    "manifest_version": "0.4",
+    "name": "proxmox-mcp-plus",
+    "display_name": "ProxmoxMCP-Plus",
+    "version": "0.5.23",
+    "description": "An enhanced MCP server for managing Proxmox virtualization platforms.",
+    "long_description": "ProxmoxMCP-Plus is an enhanced Model Context Protocol (MCP) server that provides comprehensive tools for managing Proxmox virtualization environments, including VM lifecycle, container management, snapshot operations, and backup/restore capabilities.",
+    "author": {
+        "name": "Kevin",
+        "email": "kevin@example.com"
+    },
+    "server": {
+        "type": "python",
+        "entry_point": "main.py",
+        "mcp_config": {
+            "command": "python3",
+            "args": [
+                "${__dirname}/main.py"
+            ],
+            "env": {
+                "PYTHONPATH": "${__dirname}/src",
+                "PROXMOX_HOST": "${user_config.proxmox_host}",
+                "PROXMOX_USER": "${user_config.proxmox_user}",
+                "PROXMOX_TOKEN_NAME": "${user_config.proxmox_token_name}",
+                "PROXMOX_TOKEN_VALUE": "${user_config.proxmox_token_value}",
+                "PROXMOX_PORT": "${user_config.proxmox_port}",
+                "PROXMOX_VERIFY_SSL": "${user_config.proxmox_verify_ssl}",
+                "PROXMOX_DEV_MODE": "${user_config.proxmox_dev_mode}",
+                "PROXMOX_SERVICE": "${user_config.proxmox_service}",
+                "LOG_LEVEL": "${user_config.log_level}"
+            }
+        }
+    },
+    "user_config": {
+        "proxmox_host": {
+            "type": "string",
+            "title": "Proxmox Host",
+            "description": "The IP address or hostname of your Proxmox server",
+            "required": true
+        },
+        "proxmox_user": {
+            "type": "string",
+            "title": "Proxmox User",
+            "description": "Username (e.g. root@pam)",
+            "required": true
+        },
+        "proxmox_token_name": {
+            "type": "string",
+            "title": "Token Name",
+            "description": "API token ID",
+            "required": true
+        },
+        "proxmox_token_value": {
+            "type": "string",
+            "title": "Token Value",
+            "description": "API token secret value",
+            "required": true,
+            "sensitive": true
+        },
+        "proxmox_port": {
+            "type": "string",
+            "title": "Proxmox Port",
+            "description": "PVE API port",
+            "default": "8006",
+            "required": false
+        },
+        "proxmox_verify_ssl": {
+            "type": "string",
+            "title": "Verify SSL",
+            "description": "Set to 'true' or 'false'",
+            "default": "true",
+            "required": false
+        },
+        "proxmox_dev_mode": {
+            "type": "string",
+            "title": "Development Mode",
+            "description": "Set to 'true' only when using PROXMOX_VERIFY_SSL=false in a self-signed lab.",
+            "default": "false",
+            "required": false
+        },
+        "proxmox_service": {
+            "type": "string",
+            "title": "Proxmox Service",
+            "description": "Service type (default: PVE)",
+            "default": "PVE",
+            "required": false
+        },
+        "log_level": {
+            "type": "string",
+            "title": "Log Level",
+            "description": "Logging level (DEBUG, INFO, WARNING, ERROR)",
+            "default": "INFO",
+            "required": false
+        }
+    },
+    "tools": [
+        {
+            "name": "list_targets",
+            "description": "List configured Proxmox targets without exposing credentials"
+        },
+        {
+            "name": "get_nodes",
+            "description": "List all nodes in the Proxmox cluster"
+        },
+        {
+            "name": "get_node_status",
+            "description": "Get detailed status of a specific node"
+        },
+        {
+            "name": "get_vms",
+            "description": "List all virtual machines across the cluster"
+        },
+        {
+            "name": "get_vm_config",
+            "description": "Get full configuration for a QEMU virtual machine"
+        },
+        {
+            "name": "set_vm_description",
+            "description": "Set/replace the description (Notes field) of a QEMU virtual machine"
+        },
+        {
+            "name": "update_vm_config",
+            "description": "Update sizing (memory, cores, sockets, name, tags) and cloud-init settings (sshkeys, ciuser, ipconfig0, nameserver, searchdomain) of an existing QEMU virtual machine"
+        },
+        {
+            "name": "get_vm_ip_addresses",
+            "description": "Get a running VM's network interfaces and IP addresses via the QEMU guest agent"
+        },
+        {
+            "name": "get_next_vmid",
+            "description": "Get the next free VM/container ID in the cluster"
+        },
+        {
+            "name": "create_vm",
+            "description": "Create a new virtual machine with specified resources"
+        },
+        {
+            "name": "clone_vm",
+            "description": "Clone an existing virtual machine"
+        },
+        {
+            "name": "execute_vm_command",
+            "description": "Execute a shell command in a VM using QEMU Guest Agent"
+        },
+        {
+            "name": "start_vm",
+            "description": "Start a virtual machine"
+        },
+        {
+            "name": "stop_vm",
+            "description": "Force stop a virtual machine"
+        },
+        {
+            "name": "shutdown_vm",
+            "description": "Gracefully shutdown a virtual machine"
+        },
+        {
+            "name": "reset_vm",
+            "description": "Reset (restart) a virtual machine"
+        },
+        {
+            "name": "delete_vm",
+            "description": "Completely delete a virtual machine"
+        },
+        {
+            "name": "get_storage",
+            "description": "List available storage pools"
+        },
+        {
+            "name": "get_cluster_status",
+            "description": "Get overall cluster status and health"
+        },
+        {
+            "name": "list_jobs",
+            "description": "List persistent Proxmox task jobs"
+        },
+        {
+            "name": "get_job",
+            "description": "Get a persistent job by ID"
+        },
+        {
+            "name": "poll_job",
+            "description": "Poll a Proxmox task job for current status"
+        },
+        {
+            "name": "cancel_job",
+            "description": "Request cancellation for a Proxmox task job"
+        },
+        {
+            "name": "retry_job",
+            "description": "Retry an eligible failed or cancelled job"
+        },
+        {
+            "name": "get_containers",
+            "description": "List all LXC containers"
+        },
+        {
+            "name": "start_container",
+            "description": "Start LXC containers"
+        },
+        {
+            "name": "stop_container",
+            "description": "Stop LXC containers"
+        },
+        {
+            "name": "restart_container",
+            "description": "Restart LXC containers"
+        },
+        {
+            "name": "update_container_resources",
+            "description": "Update CPU/Memory/Disk for an LXC container"
+        },
+        {
+            "name": "create_container",
+            "description": "Create a new LXC container"
+        },
+        {
+            "name": "delete_container",
+            "description": "Delete LXC containers"
+        },
+        {
+            "name": "execute_container_command",
+            "description": "Execute a shell command inside an LXC container via SSH"
+        },
+        {
+            "name": "update_container_ssh_keys",
+            "description": "Update root authorized_keys inside an LXC container"
+        },
+        {
+            "name": "get_container_config",
+            "description": "Get full configuration for an LXC container"
+        },
+        {
+            "name": "set_container_description",
+            "description": "Set/replace the description (Notes field) of an LXC container"
+        },
+        {
+            "name": "get_container_ip",
+            "description": "Get current IP address information for an LXC container"
+        },
+        {
+            "name": "list_snapshots",
+            "description": "List all snapshots for a VM or container"
+        },
+        {
+            "name": "create_snapshot",
+            "description": "Create a new snapshot"
+        },
+        {
+            "name": "delete_snapshot",
+            "description": "Delete a specific snapshot"
+        },
+        {
+            "name": "rollback_snapshot",
+            "description": "Rollback to a specific snapshot"
+        },
+        {
+            "name": "list_isos",
+            "description": "List available ISO images"
+        },
+        {
+            "name": "list_templates",
+            "description": "List available LXC templates"
+        },
+        {
+            "name": "download_iso",
+            "description": "Download an ISO image"
+        },
+        {
+            "name": "delete_iso",
+            "description": "Delete an ISO or template"
+        },
+        {
+            "name": "list_backups",
+            "description": "List available backups"
+        },
+        {
+            "name": "create_backup",
+            "description": "Create a backup of a VM or container"
+        },
+        {
+            "name": "restore_backup",
+            "description": "Restore from a backup"
+        },
+        {
+            "name": "delete_backup",
+            "description": "Delete a specific backup"
+        },
+        {
+            "name": "get_node_syslog",
+            "description": "Read syslog entries from a Proxmox node"
+        },
+        {
+            "name": "get_task_log",
+            "description": "Get the log output of a specific Proxmox task by its UPID"
+        },
+        {
+            "name": "get_cluster_log",
+            "description": "Read recent cluster-wide log entries"
+        },
+        {
+            "name": "get_node_firewall_log",
+            "description": "Read the host firewall log of a Proxmox node"
+        },
+        {
+            "name": "get_guest_firewall_log",
+            "description": "Read the firewall log of a VM (qemu) or container (lxc)"
+        },
+        {
+            "name": "update_container_network",
+            "description": "Update an existing LXC network interface, preserving unspecified NIC settings."
+        },
+        {
+            "name": "list_bridges",
+            "description": "List Linux/OVS bridges and permitted SDN VNets on a selected node."
+        }
+    ],
+    "keywords": [
+        "proxmox",
+        "mcp",
+        "virtualization",
+        "vm",
+        "lxc",
+        "hypervisor"
+    ],
+    "license": "MIT",
+    "compatibility": {
+        "platforms": [
+            "darwin",
+            "win32",
+            "linux"
+        ],
+        "runtimes": {
+            "python": ">=3.11"
+        }
+    }
+}

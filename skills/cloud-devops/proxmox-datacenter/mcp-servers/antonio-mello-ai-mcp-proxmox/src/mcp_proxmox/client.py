@@ -1,0 +1,479 @@
+"""Proxmox VE API client wrapper."""
+
+from __future__ import annotations
+
+import shlex
+from typing import Any, cast
+from urllib.parse import quote
+
+from proxmoxer import ProxmoxAPI  # type: ignore[import-untyped]
+
+from mcp_proxmox.config import ProxmoxConfig
+
+# --- QEMU sendkey key mapping ---
+# Maps human-readable key names to QEMU Monitor key codes.
+# Reference: https://qemu-project.gitlab.io/qemu/system/keys.html
+_QEMU_KEY_MAP: dict[str, str] = {
+    # Modifiers
+    "ctrl": "ctrl",
+    "alt": "alt",
+    "shift": "shift",
+    "win": "meta_l",
+    "super": "meta_l",
+    "meta": "meta_l",
+    "meta_l": "meta_l",
+    "meta_r": "meta_r",
+    # Special keys
+    "enter": "ret",
+    "return": "ret",
+    "ret": "ret",
+    "esc": "esc",
+    "escape": "esc",
+    "tab": "tab",
+    "backspace": "backspace",
+    "space": "spc",
+    "spc": "spc",
+    "delete": "delete",
+    "del": "delete",
+    "insert": "insert",
+    "home": "home",
+    "end": "end",
+    "pageup": "pgup",
+    "pgup": "pgup",
+    "pagedown": "pgdn",
+    "pgdn": "pgdn",
+    "up": "up",
+    "down": "down",
+    "left": "left",
+    "right": "right",
+    # Function keys
+    "f1": "f1",
+    "f2": "f2",
+    "f3": "f3",
+    "f4": "f4",
+    "f5": "f5",
+    "f6": "f6",
+    "f7": "f7",
+    "f8": "f8",
+    "f9": "f9",
+    "f10": "f10",
+    "f11": "f11",
+    "f12": "f12",
+    # Common combos (shortcuts)
+    "ctrl-alt-delete": "ctrl-alt-delete",
+    "ctrl-alt-f2": "ctrl-alt-f2",
+}
+
+
+def _parse_key_combo(key: str) -> str:
+    """Convert a human-readable key or combo to QEMU Monitor key code.
+
+    Examples:
+        'enter' -> 'ret'
+        'ctrl-alt-delete' -> 'ctrl-alt-delete'
+        'win-r' -> 'meta_l-r'
+        'a' -> 'a'
+        'shift-a' -> 'shift-a'
+
+    Args:
+        key: Key name or hyphen-separated combo.
+
+    Returns:
+        QEMU Monitor key code string.
+    """
+    key_lower = key.lower().strip()
+
+    # Fast path: full combo already mapped
+    if key_lower in _QEMU_KEY_MAP:
+        return _QEMU_KEY_MAP[key_lower]
+
+    parts = key_lower.split("-")
+    mapped = [_QEMU_KEY_MAP.get(p, p) for p in parts]
+    return "-".join(mapped)
+
+
+class ProxmoxClient:
+    """Thin wrapper around proxmoxer providing typed access to Proxmox VE API.
+
+    Handles connection lifecycle and provides helper methods for common
+    operations like resolving a VMID to its node.
+    """
+
+    def __init__(self, config: ProxmoxConfig) -> None:
+        self._config = config
+        self._api: Any = None
+
+    @property
+    def api(self) -> Any:
+        """Lazy-initialize and return the Proxmox API connection."""
+        if self._api is None:
+            self._api = ProxmoxAPI(
+                self._config.host,
+                port=self._config.port,
+                user=self._config.token_id.split("!")[0],
+                token_name=self._config.token_id.split("!")[-1],
+                token_value=self._config.token_secret,
+                verify_ssl=self._config.verify_ssl,
+                timeout=30,
+            )
+        return self._api
+
+    def get_nodes(self) -> list[dict[str, Any]]:
+        """List all nodes in the cluster."""
+        return cast(list[dict[str, Any]], self.api.nodes.get())
+
+    def get_node_status(self, node: str) -> dict[str, Any]:
+        """Get detailed status for a specific node."""
+        return cast(dict[str, Any], self.api.nodes(node).status.get())
+
+    def get_cluster_resources(self, resource_type: str | None = None) -> list[dict[str, Any]]:
+        """Get cluster resources, optionally filtered by type (vm, storage, node)."""
+        if resource_type:
+            return cast(list[dict[str, Any]], self.api.cluster.resources.get(type=resource_type))
+        return cast(list[dict[str, Any]], self.api.cluster.resources.get())
+
+    def find_guest(self, vmid: int) -> dict[str, Any] | None:
+        """Find a VM or container by VMID across all nodes.
+
+        Returns a dict with 'node', 'type' ('qemu' or 'lxc'), and 'vmid',
+        or None if not found.
+        """
+        for resource in self.get_cluster_resources():
+            if resource.get("vmid") == vmid and resource.get("type") in ("qemu", "lxc"):
+                return resource
+        return None
+
+    def get_guest_status(self, node: str, vmid: int, guest_type: str) -> dict[str, Any]:
+        """Get current status of a VM or container."""
+        if guest_type == "qemu":
+            return cast(dict[str, Any], self.api.nodes(node).qemu(vmid).status.current.get())
+        return cast(dict[str, Any], self.api.nodes(node).lxc(vmid).status.current.get())
+
+    def get_guest_config(self, node: str, vmid: int, guest_type: str) -> dict[str, Any]:
+        """Get configuration of a VM or container."""
+        if guest_type == "qemu":
+            return cast(dict[str, Any], self.api.nodes(node).qemu(vmid).config.get())
+        return cast(dict[str, Any], self.api.nodes(node).lxc(vmid).config.get())
+
+    def guest_action(self, node: str, vmid: int, guest_type: str, action: str) -> str:
+        """Execute a lifecycle action (start, stop, shutdown, reboot) on a guest.
+
+        Returns the UPID of the task.
+        """
+        if guest_type == "qemu":
+            endpoint = getattr(self.api.nodes(node).qemu(vmid).status, action)
+        else:
+            endpoint = getattr(self.api.nodes(node).lxc(vmid).status, action)
+        return cast(str, endpoint.post())
+
+    def get_snapshots(self, node: str, vmid: int, guest_type: str) -> list[dict[str, Any]]:
+        """List snapshots for a VM or container."""
+        if guest_type == "qemu":
+            return cast(list[dict[str, Any]], self.api.nodes(node).qemu(vmid).snapshot.get())
+        return cast(list[dict[str, Any]], self.api.nodes(node).lxc(vmid).snapshot.get())
+
+    def create_snapshot(
+        self,
+        node: str,
+        vmid: int,
+        guest_type: str,
+        name: str,
+        description: str = "",
+    ) -> str:
+        """Create a snapshot. Returns the UPID of the task."""
+        params: dict[str, Any] = {"snapname": name}
+        if description:
+            params["description"] = description
+        if guest_type == "qemu":
+            return cast(str, self.api.nodes(node).qemu(vmid).snapshot.post(**params))
+        return cast(str, self.api.nodes(node).lxc(vmid).snapshot.post(**params))
+
+    def rollback_snapshot(self, node: str, vmid: int, guest_type: str, name: str) -> str:
+        """Rollback to a snapshot. Returns the UPID of the task."""
+        if guest_type == "qemu":
+            return cast(str, self.api.nodes(node).qemu(vmid).snapshot(name).rollback.post())
+        return cast(str, self.api.nodes(node).lxc(vmid).snapshot(name).rollback.post())
+
+    # --- Storage ---
+
+    def get_storages(self, node: str) -> list[dict[str, Any]]:
+        """List storage pools available on a node."""
+        return cast(list[dict[str, Any]], self.api.nodes(node).storage.get())
+
+    def get_storage_content(
+        self,
+        node: str,
+        storage: str,
+        content_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List content of a storage pool (ISOs, templates, disk images, backups).
+
+        content_type: 'iso', 'vztmpl', 'backup', 'images', 'rootdir', or None for all.
+        """
+        params: dict[str, Any] = {}
+        if content_type:
+            params["content"] = content_type
+        return cast(
+            list[dict[str, Any]], self.api.nodes(node).storage(storage).content.get(**params)
+        )
+
+    # --- Provisioning ---
+
+    def get_next_vmid(self) -> int:
+        """Get the next available VMID from the cluster."""
+        return cast(int, self.api.cluster.nextid.get())
+
+    def create_vm(self, node: str, vmid: int, **params: Any) -> str:
+        """Create a QEMU VM. Returns the UPID of the task."""
+        return cast(str, self.api.nodes(node).qemu.post(vmid=vmid, **params))
+
+    def create_container(self, node: str, vmid: int, **params: Any) -> str:
+        """Create an LXC container. Returns the UPID of the task."""
+        return cast(str, self.api.nodes(node).lxc.post(vmid=vmid, **params))
+
+    def clone_guest(
+        self,
+        node: str,
+        vmid: int,
+        guest_type: str,
+        newid: int,
+        **params: Any,
+    ) -> str:
+        """Clone a VM or container. Returns the UPID of the task."""
+        if guest_type == "qemu":
+            return cast(str, self.api.nodes(node).qemu(vmid).clone.post(newid=newid, **params))
+        return cast(str, self.api.nodes(node).lxc(vmid).clone.post(newid=newid, **params))
+
+    def delete_guest(self, node: str, vmid: int, guest_type: str) -> str:
+        """Delete a VM or container. Returns the UPID of the task."""
+        if guest_type == "qemu":
+            return cast(str, self.api.nodes(node).qemu(vmid).delete())
+        return cast(str, self.api.nodes(node).lxc(vmid).delete())
+
+    def delete_snapshot(self, node: str, vmid: int, guest_type: str, name: str) -> str:
+        """Delete a snapshot. Returns the UPID of the task."""
+        if guest_type == "qemu":
+            return cast(str, self.api.nodes(node).qemu(vmid).snapshot(name).delete())
+        return cast(str, self.api.nodes(node).lxc(vmid).snapshot(name).delete())
+
+    # --- Backup ---
+
+    def create_backup(self, node: str, vmid: int, **params: Any) -> str:
+        """Create a backup via vzdump. Returns the UPID of the task."""
+        return cast(str, self.api.nodes(node).vzdump.post(vmid=vmid, **params))
+
+    def restore_vm(self, node: str, vmid: int, archive: str, **params: Any) -> str:
+        """Restore a VM from a backup archive. Returns the UPID of the task."""
+        return cast(str, self.api.nodes(node).qemu.post(vmid=vmid, archive=archive, **params))
+
+    def restore_container(self, node: str, vmid: int, archive: str, **params: Any) -> str:
+        """Restore a container from a backup archive. Returns the UPID of the task."""
+        return cast(
+            str,
+            self.api.nodes(node).lxc.post(vmid=vmid, ostemplate=archive, restore=1, **params),
+        )
+
+    # --- Command Execution ---
+
+    def exec_qemu_agent(self, node: str, vmid: int, command: str) -> dict[str, Any]:
+        """Execute a command via QEMU guest agent. Returns the PID."""
+        # The Proxmox API expects `command` as an array (program + each argument
+        # as a separate element), not a single string. Passing a raw string with
+        # spaces breaks the request (manifests as a broken-pipe/TLS error).
+        args = shlex.split(command)
+        return cast(
+            dict[str, Any],
+            self.api.nodes(node).qemu(vmid).agent.exec.post(command=args),
+        )
+
+    def exec_qemu_agent_status(self, node: str, vmid: int, pid: int) -> dict[str, Any]:
+        """Get execution result from QEMU guest agent by PID."""
+        return cast(
+            dict[str, Any],
+            self.api.nodes(node).qemu(vmid).agent("exec-status").get(pid=pid),
+        )
+
+    # --- Network ---
+
+    def get_networks(self, node: str) -> list[dict[str, Any]]:
+        """List network interfaces/bridges on a node."""
+        return cast(list[dict[str, Any]], self.api.nodes(node).network.get())
+
+    # --- Resize ---
+
+    def update_guest_config(self, node: str, vmid: int, guest_type: str, **params: Any) -> None:
+        """Update VM or container configuration (CPU, memory, etc.)."""
+        if guest_type == "qemu":
+            self.api.nodes(node).qemu(vmid).config.put(**params)
+        else:
+            self.api.nodes(node).lxc(vmid).config.put(**params)
+
+    def resize_guest_disk(
+        self, node: str, vmid: int, guest_type: str, disk: str, size: str
+    ) -> None:
+        """Resize a guest disk. size format: '+10G' (relative) or '50G' (absolute)."""
+        if guest_type == "qemu":
+            self.api.nodes(node).qemu(vmid).resize.put(disk=disk, size=size)
+        else:
+            self.api.nodes(node).lxc(vmid).resize.put(disk=disk, size=size)
+
+    def get_tasks(self, node: str, limit: int = 20) -> list[dict[str, Any]]:
+        """List recent tasks on a node."""
+        return cast(list[dict[str, Any]], self.api.nodes(node).tasks.get(limit=limit))
+
+    def get_task_status(self, node: str, upid: str) -> dict[str, Any]:
+        """Get status of a specific task."""
+        return cast(dict[str, Any], self.api.nodes(node).tasks(upid).status.get())
+
+    # --- Firewall ---
+
+    def get_cluster_firewall_rules(self) -> list[dict[str, Any]]:
+        """List cluster-level firewall rules."""
+        return cast(list[dict[str, Any]], self.api.cluster.firewall.rules.get())
+
+    def get_node_firewall_rules(self, node: str) -> list[dict[str, Any]]:
+        """List node-level firewall rules."""
+        return cast(list[dict[str, Any]], self.api.nodes(node).firewall.rules.get())
+
+    def get_guest_firewall_rules(
+        self, node: str, vmid: int, guest_type: str
+    ) -> list[dict[str, Any]]:
+        """List firewall rules for a VM or container."""
+        if guest_type == "qemu":
+            return cast(list[dict[str, Any]], self.api.nodes(node).qemu(vmid).firewall.rules.get())
+        return cast(list[dict[str, Any]], self.api.nodes(node).lxc(vmid).firewall.rules.get())
+
+    def add_cluster_firewall_rule(self, **params: Any) -> None:
+        """Add a cluster-level firewall rule."""
+        self.api.cluster.firewall.rules.post(**params)
+
+    def add_node_firewall_rule(self, node: str, **params: Any) -> None:
+        """Add a node-level firewall rule."""
+        self.api.nodes(node).firewall.rules.post(**params)
+
+    def add_guest_firewall_rule(self, node: str, vmid: int, guest_type: str, **params: Any) -> None:
+        """Add a firewall rule to a VM or container."""
+        if guest_type == "qemu":
+            self.api.nodes(node).qemu(vmid).firewall.rules.post(**params)
+        else:
+            self.api.nodes(node).lxc(vmid).firewall.rules.post(**params)
+
+    def delete_cluster_firewall_rule(self, pos: int) -> None:
+        """Delete a cluster-level firewall rule by position."""
+        self.api.cluster.firewall.rules(pos).delete()
+
+    def delete_node_firewall_rule(self, node: str, pos: int) -> None:
+        """Delete a node-level firewall rule by position."""
+        self.api.nodes(node).firewall.rules(pos).delete()
+
+    def delete_guest_firewall_rule(self, node: str, vmid: int, guest_type: str, pos: int) -> None:
+        """Delete a firewall rule from a VM or container by position."""
+        if guest_type == "qemu":
+            self.api.nodes(node).qemu(vmid).firewall.rules(pos).delete()
+        else:
+            self.api.nodes(node).lxc(vmid).firewall.rules(pos).delete()
+
+    # --- Templates ---
+
+    def convert_to_template(self, node: str, vmid: int) -> None:
+        """Convert a VM to a template. The VM must be stopped."""
+        self.api.nodes(node).qemu(vmid).template.post()
+
+    # --- Migration ---
+
+    def migrate_guest(
+        self, node: str, vmid: int, guest_type: str, target: str, online: bool = True
+    ) -> str:
+        """Migrate a VM or container to another node. Returns the UPID."""
+        if guest_type == "qemu":
+            return cast(
+                str,
+                self.api.nodes(node).qemu(vmid).migrate.post(target=target, online=int(online)),
+            )
+        return cast(
+            str,
+            self.api.nodes(node).lxc(vmid).migrate.post(target=target, online=int(online)),
+        )
+
+    # --- Console Interaction (Screenshot & Sendkey) ---
+
+    def screenshot_vm(self, node: str, vmid: int) -> bytes:
+        """Capture a PNG screenshot of a QEMU VM's display via the Proxmox VNC tunnel.
+
+        Opens a VNC websocket tunnel (vncproxy + vncwebsocket API calls), performs
+        the RFB handshake, requests a full raw framebuffer update, and encodes it
+        as PNG. This is the same mechanism noVNC uses in the Proxmox web UI.
+
+        Requires the 'VM.Console' privilege on the VM.
+
+        Args:
+            node: Proxmox node name.
+            vmid: QEMU VM ID.
+
+        Returns:
+            PNG image data as bytes.
+        """
+        from mcp_proxmox.vnc import capture_vnc_screenshot
+
+        # 1. Open a VNC proxy ticket
+        proxy = cast(
+            dict[str, Any],
+            self.api.nodes(node).qemu(vmid).vncproxy.post(websocket=1),
+        )
+        ticket_port = int(proxy["port"])
+        ticket = str(proxy["ticket"])
+
+        # 2. Authorize the websocket connection with the ticket. The response
+        #    only carries a user/subprotocol pair that is not needed here —
+        #    the actual tunnel goes through pveproxy on the API port.
+        self.api.nodes(node).qemu(vmid).vncwebsocket.get(port=ticket_port, vncticket=ticket)
+
+        # 3. Connect to the tunnel via pveproxy (like noVNC does) and capture
+        #    a full framebuffer as PNG.
+        ticket_port_str = str(ticket_port)
+        api_path = (
+            f"/api2/json/nodes/{node}/qemu/{vmid}/vncwebsocket"
+            f"?port={ticket_port_str}&vncticket={quote(ticket, safe='')}"
+        )
+        auth_header = f"PVEAPIToken={self._config.token_id}={self._config.token_secret}"
+        return capture_vnc_screenshot(
+            host=self._config.host,
+            ws_port=ticket_port,
+            use_ssl=True,
+            verify_ssl=self._config.verify_ssl,
+            timeout=20.0,
+            api_port=self._config.port,
+            api_path=api_path,
+            auth_header=auth_header,
+            password=ticket,  # the VNC proxy ticket doubles as the VNC password
+        )
+
+    def sendkey_vm(self, node: str, vmid: int, key: str) -> None:
+        """Send a key or key combination to a QEMU VM via the Proxmox sendkey endpoint.
+
+        Uses PUT /api2/json/nodes/{node}/qemu/{vmid}/sendkey with the 'key' parameter.
+        The key is converted from human-readable form to QEMU Monitor key codes.
+
+        Requires the 'VM.Console' privilege on the VM.
+
+        Args:
+            node: Proxmox node name.
+            vmid: QEMU VM ID.
+            key: QEMU key code string (e.g. 'ctrl-alt-delete', 'ret', 'esc').
+        """
+        qemu_key = _parse_key_combo(key)
+        self.api.nodes(node).qemu(vmid).sendkey.put(key=qemu_key)
+
+    def get_rrd_data(
+        self, node: str, vmid: int, guest_type: str, timeframe: str = "hour"
+    ) -> list[dict[str, Any]]:
+        """Get RRD metrics data for a guest. Timeframe: hour, day, week, month, year."""
+        if guest_type == "qemu":
+            return cast(
+                list[dict[str, Any]],
+                self.api.nodes(node).qemu(vmid).rrddata.get(timeframe=timeframe),
+            )
+        return cast(
+            list[dict[str, Any]],
+            self.api.nodes(node).lxc(vmid).rrddata.get(timeframe=timeframe),
+        )
