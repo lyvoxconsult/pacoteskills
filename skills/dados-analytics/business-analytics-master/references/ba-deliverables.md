@@ -16,6 +16,12 @@ Use apenas as secoes que ajudam o leitor a tomar uma decisao ou executar o traba
 | "Avalie fornecedores" | Criterios ponderados e decisao rastreavel | Pesos, evidencias, requisitos eliminatorios e riscos sao comparaveis? |
 | "Prepare a validacao" | Plano UAT e matriz requisito → teste | Ha cenarios positivos, negativos, permissoes, excecoes e aceite do negocio? |
 | "Crie um prompt para fazer isso" | Prompt executavel para outro agente | O executor sabe o que ler, fazer, testar e relatar? |
+| "Tenho esse problema, mas nao sei se preciso de software" | Diagnostico, opcoes de processo/tecnologia e recomendacao | A causa foi testada? O custo de manter o estado atual foi considerado? |
+| "Os setores discordam do que deve ser feito" | Mapa de stakeholders, interesses, divergencias e decisoes | Quem decide, quem opera e que evidencia resolve o conflito? |
+| "Vamos trocar o processo/ferramenta" | Analise de impacto e plano de transicao | Quem muda de rotina? Ha migracao, treinamento, suporte, risco e medida de adocao? |
+| "Ja entregamos. Funcionou?" | Avaliacao da solucao e beneficios realizados | Baseline, uso real, efeitos indesejados e limitacoes foram medidos? |
+
+Para estrategia, processo, mudanca, stakeholders e avaliacao posterior, consulte [ba-lifecycle.md](ba-lifecycle.md). Para decisoes com numeros, consulte [analytics-and-decisions.md](analytics-and-decisions.md). Nao trate estas linhas como documentos obrigatorios: escolha a menor entrega que resolva a pergunta.
 
 ## Especificacao de ferramenta digital
 

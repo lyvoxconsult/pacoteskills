@@ -36,7 +36,7 @@ O diretório `skills/` reúne **1.493 skills operacionais**, organizadas em **ca
 ### 📊 Dados, Analytics & MLOps
 
 - **[`dados-analytics/`](dados-analytics)** (`62 skills`): Engenharia e Análise de Dados — *Data pipelines, dbt, Spark, MLOps, modelagem estatística, Pandas, Polars, visualização de dados e métricas.*
-- **[`business-analytics-master`](dados-analytics/business-analytics-master/SKILL.md)**: transforma calls, transcrições, planilhas e pedidos simples em descoberta BA, dependências, requisitos para aprovação, especificações e dashboards; cria prompts quando solicitados. [Fontes e curadoria](dados-analytics/business-analytics-master/SOURCES.md).
+- **[`business-analytics-master`](dados-analytics/business-analytics-master/SKILL.md)**: análise de negócios ponta a ponta: descoberta, estratégia, processos, stakeholders, requisitos, decisões, dados, mudança e avaliação de resultados. Calls e dashboards são dois casos de uso. [Fontes e curadoria](dados-analytics/business-analytics-master/SOURCES.md).
 
 ### 🏛️ Arquitetura & Engenharia de Software
 
