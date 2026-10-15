@@ -1,0 +1,16 @@
+{
+  "run_id": "synthetic-example-001",
+  "observed_at_utc": "2026-10-05T00:00:00Z",
+  "environment": "fixture",
+  "resource": "example-service",
+  "requirement": "Unauthorized principal must not read protected resource",
+  "principal": "synthetic-denied-role",
+  "method": "fixture-only",
+  "expected": "permission_denied",
+  "observed": "timeout",
+  "status": "UNKNOWN",
+  "evidence_ref": "synthetic-fixture-not-a-live-test",
+  "uncertainty": "Timeout alone does not identify a permission failure",
+  "source_version": "fixture-v1",
+  "accepted_risk": null
+}

@@ -1,0 +1,16 @@
+{
+  "format_version": "1.2",
+  "complete": true,
+  "errored": false,
+  "resource_changes": [
+    {
+      "address": "example_vm.app",
+      "change": {"actions": ["update"]}
+    },
+    {
+      "address": "example_vm.app",
+      "deposed": "deadbeef",
+      "change": {"actions": ["delete"]}
+    }
+  ]
+}

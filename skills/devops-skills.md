@@ -4,6 +4,14 @@ Esta skill detalha os padrões operacionais para provisionamento de containers, 
 
 ---
 
+## DevopsMasterPro
+
+Skill operacional: [DevopsMasterPro](cloud-devops/devops-master-pro/SKILL.md).
+Inclui arquitetura, Proxmox, redes/pfSense, AD, configuracao por maquina,
+Terraform/OpenTofu, cofre de segredos, auditoria, backups e aprovacao humana
+obrigatoria para exclusoes. Consulte o manifesto para os catalogos locais
+Codex, Agents e Antigravity; publicacao remota e uma etapa separada.
+
 ## 🗃️ Containerização (Docker e Docker Compose)
 
 1. **Escrita de Dockerfiles Otimizados:**

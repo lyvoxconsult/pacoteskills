@@ -1,0 +1,4 @@
+interface:
+  display_name: "DevopsMasterPro"
+  short_description: "Infraestrutura com evidencias e controle humano"
+  default_prompt: "Use $devops-master-pro para avaliar e operar esta infraestrutura com escopo definido, evidencias funcionais e aprovacao humana para exclusoes."

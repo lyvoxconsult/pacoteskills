@@ -1,0 +1,5 @@
+---
+ansible_host: app-b.example.invalid
+machine_owner: example-application-team
+machine_purpose: application
+secret_reference: vault://example-lab/ssh/app-b

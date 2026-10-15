@@ -2,6 +2,21 @@
 
 Captura saneada do ambiente local em `2026-08-28`.
 
+## Conferencia local em 2026-10-15
+
+Nomes observados na configuracao desta maquina, sem copiar URL, comando, header, token ou caminho local. A presenca na configuracao nao comprova conexao funcional:
+
+| Nome | Estado configurado | Nota de catalogo |
+|---|---|---|
+| `node_repl` | configurado | runtime local; ja constava da captura anterior |
+| `playwright` | configurado | automacao de navegador; ja constava |
+| `sequential-thinking` | configurado | **novo no inventario**; conferir pacote e comandos na maquina de destino |
+| `computer-use` | desabilitado | **novo no inventario**; nao presumir uso ativo |
+| `stitch` | configurado | ja constava |
+| `21st` | configurado | **novo no inventario**; nome de configuracao local, sem template de segredo |
+
+Os demais nomes da captura de agosto abaixo nao foram confirmados na configuracao atual. Podem estar expostos por plugins ou conectores fora de `config.toml`; valide no host de destino antes de reproduzir. Nao replique entradas de autenticacao diretamente.
+
 ## Ativos
 
 | Nome | Tipo | Inicializacao | Observacoes |

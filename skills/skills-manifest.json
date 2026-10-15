@@ -137,6 +137,26 @@
       "compatibility": "${HOME}/.agents/skills/devops-skill/SKILL.md"
     },
     {
+      "name": "devops-master-pro",
+      "required": "conditional-infrastructure-devops-audit-and-recovery",
+      "status": "available-canonical-and-compatibility",
+      "canonical": "${HOME}/.codex/skills/devops-master-pro/SKILL.md",
+      "compatibility": "${HOME}/.agents/skills/devops-master-pro/SKILL.md",
+      "antigravity": "${HOME}/.agents/skills/antigravity/devops-master-pro/SKILL.md",
+      "package": "cloud-devops/devops-master-pro/SKILL.md"
+    },
+    {
+      "name": "business-analytics-master",
+      "required": "conditional-business-analytics-kpi-metric-diagnostics-and-decision-support",
+      "status": "available-canonical-and-compatibility",
+      "canonical": "${HOME}/.codex/skills/business-analytics-master/SKILL.md",
+      "compatibility": "${HOME}/.agents/skills/business-analytics-master/SKILL.md",
+      "codexAntigravity": "${HOME}/.codex/skills/antigravity/business-analytics-master/SKILL.md",
+      "antigravity": "${HOME}/.agents/skills/antigravity/business-analytics-master/SKILL.md",
+      "claude": "${HOME}/.claude/skills/business-analytics-master/SKILL.md",
+      "package": "dados-analytics/business-analytics-master/SKILL.md"
+    },
+    {
       "name": "playwright",
       "required": "conditional-browser-ui-flow-validation",
       "status": "available-canonical",
