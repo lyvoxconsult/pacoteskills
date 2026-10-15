@@ -16,5 +16,6 @@ Consulta em 2026-10-15. Estrelas sao do **repositorio**, nao da skill individual
 - `business-analyst`, `startup-metrics-framework`, `market-sizing-analysis`, `startup-financial-modeling` no hub `comercial/06-estrategia-negocios-startups/`.
 - `analytics-product`, `data-quality-frameworks`, `data-storytelling`, `dbt-transformation-patterns` em `skills/dados-analytics/`.
 - `kpi-dashboard-design` em `skills/programacao/frontend/`.
+- `devpromptarchitect` nos catalogos globais: traducao de pedidos informais em instrucoes tecnicas, planejamento, aceite, autonomia e verificacao. Nesta skill, esses principios foram adaptados para BA e para entregar diretamente documentacao ou analise quando solicitado.
 
 O material local ja cobria partes do dominio. Esta skill coordena o fluxo de decisao, verificacao e comunicacao sem substituir as especializadas. Estrelas, instalacoes e disponibilidade de fontes devem ser rechecadas antes de recomendacoes futuras.
