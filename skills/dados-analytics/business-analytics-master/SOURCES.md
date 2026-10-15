@@ -19,3 +19,14 @@ Consulta em 2026-10-15. Estrelas sao do **repositorio**, nao da skill individual
 - `devpromptarchitect` nos catalogos globais: traducao de pedidos informais em instrucoes tecnicas, planejamento, aceite, autonomia e verificacao. Nesta skill, esses principios foram adaptados para BA e para entregar diretamente documentacao ou analise quando solicitado.
 
 O material local ja cobria partes do dominio. Esta skill coordena o fluxo de decisao, verificacao e comunicacao sem substituir as especializadas. Estrelas, instalacoes e disponibilidade de fontes devem ser rechecadas antes de recomendacoes futuras.
+
+## Fontes adicionais para descoberta e especificacao
+
+Pesquisa em 2026-10-15 via `find-skills`, seguida de leitura das fontes. As contagens abaixo sao do repositorio no momento da consulta; nenhuma skill externa foi instalada ou copiada integralmente.
+
+| Fonte | Sinal observado | Ideia adaptada |
+|---|---:|---|
+| [Anthropic — synthesize-research](https://github.com/anthropics/knowledge-work-plugins/blob/main/product-management/skills/synthesize-research/SKILL.md) e [product-management](https://github.com/anthropics/knowledge-work-plugins/blob/main/product-management/README.md) | 29.747 estrelas no repositorio | Extrair observacoes de entrevistas/transcricoes, contradicoes e requisitos rastreaveis. |
+| [Microsoft PromptKit — requirements-elicitation](https://github.com/microsoft/PromptKit/blob/main/protocols/reasoning/requirements-elicitation.md) | 111 estrelas no repositorio | Requisitos atomicos, ambiguidade, dependencias, conflitos e aceite verificavel. |
+| [juxt/allium — elicit](https://github.com/juxt/allium/blob/main/skills/elicit/SKILL.md) | 512 estrelas no repositorio; 2,6 mil instalacoes no `find-skills` | Descoberta do processo e escopo antes da especificacao; nenhuma dependencia da linguagem Allium. |
+| [nimrodfisher/data-analytics-skills — dashboard-specification](https://github.com/nimrodfisher/data-analytics-skills/blob/main/04-data-storytelling-visualization/dashboard-specification/SKILL.md) e [interview guide](https://github.com/nimrodfisher/data-analytics-skills/blob/main/05-stakeholder-communication/stakeholder-requirements-gathering/assets/interview_guide.md) | 476 estrelas no repositorio | Ligar decisao de negocio, dados, metrica, visual e criterios de aceite. |

@@ -4,6 +4,9 @@ Use apenas as secoes que ajudam o leitor a tomar uma decisao ou executar o traba
 
 | Pedido do usuario | Entrega principal | Perguntas de qualidade |
 |---|---|---|
+| "Anexei a gravacao/transcricao da call. Estruture o que o cliente precisa" | Pacote de descoberta para validacao do cliente, com rastreabilidade | O que foi dito, inferido ou sugerido? Quais dependencias sao indispensaveis? O que precisa de aprovacao? |
+| "O cliente aprovou os requisitos. Planeje a construcao" | Especificacao consolidada, arquitetura proposta, backlog e validacao | Qual versao foi aprovada? Que decisoes mudaram? O plano respeita as dependencias? |
+| "Transforme esta planilha em dashboard" | Dicionario de dados, mapa campo → metrica → visual e fluxo de importacao | O significado, grao, formula e qualidade de cada dado foram conferidos? |
 | "Documente a ferramenta que quero criar" | Especificacao funcional e tecnica proposta | Quem usa? Qual problema? Quais fluxos, regras, dados, permissoes, integracoes e aceite? |
 | "Explique como melhorar este processo" | Diagnostico AS-IS/TO-BE, lacunas e plano de transicao | Onde ha espera, retrabalho, erro, controle, dependencia e medicao? |
 | "Transforme minha ideia em requisitos" | BRD/PRD enxuto, backlog e rastreabilidade | Cada requisito cria valor? E observavel e testavel? |
@@ -30,6 +33,8 @@ Estrutura recomendada para uma ferramenta nova. Omitir ou reduzir secoes que nao
 10. **Riscos e premissas:** impacto, probabilidade quando justificavel, mitigacao, responsavel e modo de validar.
 11. **Aceite e validacao:** matriz requisito → teste/UAT; testes funcionais, permissao, erro, recuperacao e medicao de resultado.
 12. **Decisoes pendentes:** somente lacunas que alteram produto, arquitetura, custo, risco ou aceite.
+
+Em descoberta com cliente, use [discovery-from-call.md](discovery-from-call.md) antes da especificacao final. Em painel baseado em anexo, use [spreadsheet-to-dashboard.md](spreadsheet-to-dashboard.md) antes de escolher graficos ou tecnologia.
 
 Modelo de requisito:
 
